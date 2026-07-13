@@ -1,0 +1,19 @@
+[
+  {
+    "receivedAtUtc": "2026-07-13T17:13:23.5299985+00:00",
+    "gsi": {
+      "provider": {
+        "name": "Counter-Strike: Global Offensive",
+        "appid": 730,
+        "version": 14169,
+        "steamid": "76561199051163157",
+        "timestamp": 1783962803
+      },
+      "player": {
+        "steamid": "76561199051163157",
+        "name": "muelsyse",
+        "activity": "menu"
+      }
+    }
+  }
+]
