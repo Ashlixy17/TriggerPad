@@ -1,0 +1,18 @@
+# Node / Electron dependencies and generated output
+UI/node_modules/
+UI/dist/
+UI/.vite/
+
+# .NET build output
+Server/bin/
+Server/obj/
+
+# IDE and local user files
+.idea/
+.vs/
+*.user
+*.suo
+
+# OS files
+Thumbs.db
+.DS_Store

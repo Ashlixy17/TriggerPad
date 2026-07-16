@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TriggerPad")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+29a29b3fc3742f55cf723662062d8fe3dfc2e719")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a9b5f59451d8ca9e0a23701814e1b329a1bfaedb")]
 [assembly: System.Reflection.AssemblyProductAttribute("TriggerPad")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TriggerPad")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

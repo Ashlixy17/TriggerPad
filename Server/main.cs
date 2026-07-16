@@ -11,13 +11,9 @@ string? myName = null;
 using var listener = new GameStateListener(port);
 
 // 音频通过json加载
-JObject config = JObject.Parse(File.ReadAllText(" // config.json //"));
-string DiedSoundName = config["PlayerDied"]?["name"]?.Value<string>()?? "Null";
-var DiedSound = new SoundPlayer(
-    Path.Combine(
-        Directory.GetCurrentDirectory(),
-        "audio",
-        DiedSoundName));
+JObject config = JObject.Parse(File.ReadAllText("../config.json"));
+string DiedSoundName = config["PlayerDied"]?["AudioName"]?.Value<string>()?? "Null";
+var DiedSound = new SoundPlayer("../audio/" + DiedSoundName);
 
 // steamID加载
 void GetSteamID(GameState gameState)
@@ -36,11 +32,15 @@ listener.NewGameState += GetSteamID;
 // 回调使用
 listener.PlayerDied += gameEvent =>
 {
-    if(DiedSoundName != "Null")
+    if(DiedSoundName != "")
     {
         DiedSound.Play();
-        Console.WriteLine($"[INFO]{DiedSoundName}已成功播放");
+        Console.WriteLine($"{DiedSoundName}已成功播放");
     }
+};
+listener.PlayerFlashAmountChanged += gameEvent =>
+{
+    
 };
 
 // 创建cs配置文件
@@ -61,6 +61,7 @@ Console.WriteLine("启动 CS2 并进入对局；收到状态后会输出。按 E
 Console.ReadLine();
 listener.Stop();
 
+Console.WriteLine("程序已退出");
 
 // """
 //     "PlayerDied":{
