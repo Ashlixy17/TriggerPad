@@ -17,4 +17,6 @@ Server/obj/
 Thumbs.db
 .DS_Store
 /Release
-/UI/build-resources
+/UI/build-resources/*
+!/UI/build-resources/
+!/UI/build-resources/TriggerPad.ico
