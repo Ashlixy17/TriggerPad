@@ -1,5 +1,5 @@
-const { app, BrowserWindow, dialog, ipcMain, Menu } = require('electron')
-const { execFile, spawn } = require('child_process')
+const { app, BrowserWindow, dialog, ipcMain, Menu, systemPreferences } = require('electron')
+const { execFile, execFileSync, spawn } = require('child_process')
 const fs = require('fs/promises')
 const path = require('path')
 
@@ -9,9 +9,30 @@ let audioPath
 let serverPath
 let iconPath
 const audioExtensions = new Set(['.wav', '.mp3', '.ogg', '.flac', '.m4a', '.aac', '.wma'])
+const fallbackAccentColor = '#3d82f5'
 const settingKeys = new Set(['LaunchAtStartup', 'Theme', 'DefaultVolume', 'OutputDevice'])
 const readConfig = async () => JSON.parse(await fs.readFile(configPath, 'utf8'))
 const isAudioFile = fileName => audioExtensions.has(path.extname(fileName).toLowerCase())
+function readAccentColor() {
+  if (process.platform === 'win32') {
+    try {
+      const output = execFileSync('reg.exe', ['query', 'HKCU\\Software\\Microsoft\\Windows\\DWM', '/v', 'ColorizationColor'], { encoding: 'utf8', windowsHide: true })
+      const match = output.match(/ColorizationColor\s+REG_DWORD\s+0x([0-9a-f]+)/i)
+      if (match) return `#${match[1].padStart(8, '0').slice(-6)}`
+    } catch {
+      return fallbackAccentColor
+    }
+    return fallbackAccentColor
+  }
+  try {
+    const value = systemPreferences.getAccentColor()
+    if (typeof value !== 'string') return fallbackAccentColor
+    const match = value.match(/^#?([0-9a-f]{6})(?:[0-9a-f]{2})?$/i)
+    return match ? `#${match[1]}` : fallbackAccentColor
+  } catch {
+    return fallbackAccentColor
+  }
+}
 let serverProcess = null
 let gracefulStopTimer = null
 let exitAfterServerStops = false
@@ -156,6 +177,15 @@ ipcMain.handle('audio:clear', async () => {
   return []
 })
 ipcMain.handle('window:minimize', event => BrowserWindow.fromWebContents(event.sender)?.minimize())
+ipcMain.handle('window:is-maximized', event => BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false)
+ipcMain.handle('window:get-accent-color', () => readAccentColor())
+ipcMain.handle('window:toggle-maximize', event => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (!win) return false
+  if (win.isMaximized()) win.unmaximize()
+  else win.maximize()
+  return win.isMaximized()
+})
 ipcMain.handle('window:close', event => BrowserWindow.fromWebContents(event.sender)?.close())
 ipcMain.handle('server:start', async () => {
   if (serverProcess) return { started: false, message: 'Server is already running.' }
@@ -200,12 +230,16 @@ ipcMain.handle('server:stop', () => {
 
 const createWindow = () => {
   const win = new BrowserWindow({
-    width: 1220,
-    height: 880,
-    resizable: false,
-    maximizable: false,
+    width: 800,
+    height: 600,
+    minWidth: 800,
+    minHeight: 600,
+    center: true,
+    title: 'TriggerPad v0.1.0-alpha',
     frame: false,
-    backgroundColor: '#111318',
+    resizable: true,
+    thickFrame: true,
+    backgroundColor: '#1b1b1b',
     icon: iconPath,
     webPreferences: { contextIsolation: true, nodeIntegration: false, preload: path.join(__dirname, 'preload.cjs') }
   })
@@ -214,6 +248,13 @@ const createWindow = () => {
     event.preventDefault()
     requestServerStop({ quitApp: true })
   })
+  const broadcastWindowState = () => {
+    const maximized = win.isMaximized()
+    win.webContents.send('window:maximized', maximized)
+  }
+  win.on('maximize', broadcastWindowState)
+  win.on('unmaximize', broadcastWindowState)
+  win.webContents.once('did-finish-load', broadcastWindowState)
   if (process.env.VITE_DEV_SERVER_URL) {
     win.loadURL(process.env.VITE_DEV_SERVER_URL)
   } else {

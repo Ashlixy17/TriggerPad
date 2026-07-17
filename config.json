@@ -1,6 +1,6 @@
 {
   "Settings": {
-    "LaunchAtStartup": true,
+    "LaunchAtStartup": false,
     "Theme": "dark",
     "DefaultVolume": 100,
     "OutputDevice": "default"

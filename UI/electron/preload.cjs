@@ -10,6 +10,9 @@ contextBridge.exposeInMainWorld('triggerPad', {
   removeAudio: fileName => ipcRenderer.invoke('audio:remove', fileName),
   clearAudio: () => ipcRenderer.invoke('audio:clear'),
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
+  isMaximizedWindow: () => ipcRenderer.invoke('window:is-maximized'),
+  getAccentColor: () => ipcRenderer.invoke('window:get-accent-color'),
+  toggleMaximizeWindow: () => ipcRenderer.invoke('window:toggle-maximize'),
   closeWindow: () => ipcRenderer.invoke('window:close'),
   startServer: () => ipcRenderer.invoke('server:start'),
   stopServer: () => ipcRenderer.invoke('server:stop'),
@@ -22,5 +25,10 @@ contextBridge.exposeInMainWorld('triggerPad', {
     const listener = (_event, status) => callback(status)
     ipcRenderer.on('server:status', listener)
     return () => ipcRenderer.removeListener('server:status', listener)
+  },
+  onWindowMaximized: callback => {
+    const listener = (_event, maximized) => callback(Boolean(maximized))
+    ipcRenderer.on('window:maximized', listener)
+    return () => ipcRenderer.removeListener('window:maximized', listener)
   }
 })
