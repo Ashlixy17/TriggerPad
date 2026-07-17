@@ -7,6 +7,7 @@ const developmentRoot = path.join(__dirname, '..', '..')
 let configPath
 let audioPath
 let serverPath
+let iconPath
 const audioExtensions = new Set(['.wav', '.mp3', '.ogg', '.flac', '.m4a', '.aac', '.wma'])
 const settingKeys = new Set(['LaunchAtStartup', 'Theme', 'DefaultVolume', 'OutputDevice'])
 const readConfig = async () => JSON.parse(await fs.readFile(configPath, 'utf8'))
@@ -17,6 +18,9 @@ let exitAfterServerStops = false
 let allowAppQuit = false
 
 function configureRuntimePaths() {
+  iconPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'TriggerPad.ico')
+    : path.join(developmentRoot, 'UI', 'build-resources', 'TriggerPad.ico')
   if (app.isPackaged) {
     const runtimeRoot = path.join(app.getPath('userData'), 'runtime')
     configPath = path.join(runtimeRoot, 'config.json')
@@ -202,6 +206,7 @@ const createWindow = () => {
     maximizable: false,
     frame: false,
     backgroundColor: '#111318',
+    icon: iconPath,
     webPreferences: { contextIsolation: true, nodeIntegration: false, preload: path.join(__dirname, 'preload.cjs') }
   })
   win.on('close', event => {

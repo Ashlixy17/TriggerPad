@@ -1,3 +1,15 @@
+TriggerPad License Notice
+Copyright 2026 TriggerPad contributors
+SPDX-License-Identifier: Apache-2.0
+
+除非文件另有明确说明，TriggerPad 项目的源代码、文档、配置文件及项目自有资源均以 Apache License 2.0 授权。
+
+1. 本许可证不授予 Counter-Strike、Counter-Strike 2、Valve 或其他第三方商标的使用权。
+2. 用户自行导入的音频文件不属于本项目的授权内容；用户应自行确认其拥有相应的版权和使用权。
+3. 项目使用的第三方库、运行时和其他依赖仍受其各自许可证约束，不因本项目采用 Apache License 2.0 而改变。
+4. 本项目仅面向符合游戏规则的事件驱动音频用途，不读取游戏内存、不注入游戏进程，也不提供影响竞技公平性的功能。
+5. 以上项目说明用于明确授权范围和资源归属，不增加 Apache License 2.0 之外的使用限制，也不修改下方标准许可证条款。
+
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
@@ -173,10 +185,7 @@
       incurred by, or claims asserted against, such Contributor by reason
       of your accepting any such warranty or additional liability.
 
-NOTE: The Apache 2.0 license applies ONLY to the source code in this repository.
-Project icons and other visual assets are NOT covered by this license.
-
-                  END OF TERMS AND CONDITIONS
+   END OF TERMS AND CONDITIONS
 
    APPENDIX: How to apply the Apache License to your work.
 
@@ -189,7 +198,7 @@ Project icons and other visual assets are NOT covered by this license.
       same "printed page" as the copyright notice for easier
       identification within third-party archives.
 
-   Copyright [yyyy] [name of copyright owner]
+   Copyright 2026 TriggerPad contributors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
