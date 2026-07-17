@@ -1,28 +1,15 @@
 {
   "version": 2,
-  "dgSpecHash": "AgR4aPXIIT8=",
+  "dgSpecHash": "z/9uajaYUvs=",
   "success": true,
   "projectFilePath": "G:\\GitHubDeskTop\\TriggerPad\\Server\\TriggerPad.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\10041\\.nuget\\packages\\newtonsoft.json\\13.0.3\\newtonsoft.json.13.0.3.nupkg.sha512",
     "C:\\Users\\10041\\.nuget\\packages\\system.windows.extensions\\10.0.9\\system.windows.extensions.10.0.9.nupkg.sha512",
     "C:\\Users\\10041\\.nuget\\packages\\microsoft.netcore.app.ref\\8.0.22\\microsoft.netcore.app.ref.8.0.22.nupkg.sha512",
-    "C:\\Users\\10041\\.nuget\\packages\\microsoft.netcore.app.runtime.win-x64\\8.0.22\\microsoft.netcore.app.runtime.win-x64.8.0.22.nupkg.sha512",
     "C:\\Users\\10041\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\8.0.22\\microsoft.windowsdesktop.app.ref.8.0.22.nupkg.sha512",
-    "C:\\Users\\10041\\.nuget\\packages\\microsoft.windowsdesktop.app.runtime.win-x64\\8.0.22\\microsoft.windowsdesktop.app.runtime.win-x64.8.0.22.nupkg.sha512",
     "C:\\Users\\10041\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\8.0.22\\microsoft.aspnetcore.app.ref.8.0.22.nupkg.sha512",
-    "C:\\Users\\10041\\.nuget\\packages\\microsoft.aspnetcore.app.runtime.win-x64\\8.0.22\\microsoft.aspnetcore.app.runtime.win-x64.8.0.22.nupkg.sha512",
     "C:\\Users\\10041\\.nuget\\packages\\microsoft.netcore.app.host.win-x64\\8.0.22\\microsoft.netcore.app.host.win-x64.8.0.22.nupkg.sha512"
   ],
-  "logs": [
-    {
-      "code": "NU1900",
-      "level": "Warning",
-      "message": "获取包漏洞数据时出错: 无法加载源 https://api.nuget.org/v3/index.json 的服务索引。",
-      "projectPath": "G:\\GitHubDeskTop\\TriggerPad\\Server\\TriggerPad.csproj",
-      "warningLevel": 1,
-      "filePath": "G:\\GitHubDeskTop\\TriggerPad\\Server\\TriggerPad.csproj",
-      "targetGraphs": []
-    }
-  ]
+  "logs": []
 }
