@@ -8,16 +8,46 @@
     "dev": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && set VITE_DEV_SERVER_URL=http://127.0.0.1:5173 && electron .\"",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "electron ."
+    "start": "electron .",
+    "prepare-server": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-server.ps1",
+    "package": "npm run prepare-server && npm run build && set ELECTRON_BUILDER_CACHE=%TEMP%\\electron-builder-cache && electron-builder --win nsis"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
     "vite": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "electron": "latest",
     "concurrently": "latest",
     "wait-on": "latest"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "electron": "latest",
+    "electron-builder": "latest"
+  },
+  "build": {
+    "appId": "com.triggerpad.app",
+    "productName": "TriggerPad",
+    "directories": {
+      "output": "../Release",
+      "buildResources": "build-resources"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      { "from": "build-resources/server", "to": "server" },
+      { "from": "../config.json", "to": "defaults/config.json" },
+      { "from": "../audio", "to": "defaults/audio" }
+    ],
+    "win": {
+      "target": ["nsis"],
+      "artifactName": "TriggerPad-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
 }

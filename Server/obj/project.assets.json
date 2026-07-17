@@ -34,6 +34,34 @@
           }
         }
       }
+    },
+    "net8.0-windows7.0/win-x64": {
+      "Newtonsoft.Json/13.0.3": {
+        "type": "package",
+        "compile": {
+          "lib/net6.0/Newtonsoft.Json.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net6.0/Newtonsoft.Json.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "System.Windows.Extensions/10.0.9": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/System.Windows.Extensions.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "runtimes/win/lib/net8.0/System.Windows.Extensions.dll": {
+            "related": ".xml"
+          }
+        }
+      }
     }
   },
   "libraries": {
@@ -102,26 +130,24 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\10041\\.nuget\\packages\\": {}
+    "C:\\Users\\10041\\.nuget\\packages": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
       "projectUniqueName": "G:\\GitHubDeskTop\\TriggerPad\\Server\\TriggerPad.csproj",
-      "projectName": "TriggerPad",
+      "projectName": "TriggerPad.Server",
       "projectPath": "G:\\GitHubDeskTop\\TriggerPad\\Server\\TriggerPad.csproj",
-      "packagesPath": "C:\\Users\\10041\\.nuget\\packages\\",
+      "packagesPath": "C:\\Users\\10041\\.nuget\\packages",
       "outputPath": "G:\\GitHubDeskTop\\TriggerPad\\Server\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\10041\\AppData\\Roaming\\NuGet\\NuGet.Config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        "G:\\GitHubDeskTop\\TriggerPad\\UI\\scripts\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net8.0-windows"
       ],
       "sources": {
-        "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
@@ -172,6 +198,10 @@
             "version": "[8.0.22, 8.0.22]"
           },
           {
+            "name": "Microsoft.AspNetCore.App.Runtime.win-x64",
+            "version": "[8.0.22, 8.0.22]"
+          },
+          {
             "name": "Microsoft.NETCore.App.Host.win-x64",
             "version": "[8.0.22, 8.0.22]"
           },
@@ -180,7 +210,15 @@
             "version": "[8.0.22, 8.0.22]"
           },
           {
+            "name": "Microsoft.NETCore.App.Runtime.win-x64",
+            "version": "[8.0.22, 8.0.22]"
+          },
+          {
             "name": "Microsoft.WindowsDesktop.App.Ref",
+            "version": "[8.0.22, 8.0.22]"
+          },
+          {
+            "name": "Microsoft.WindowsDesktop.App.Runtime.win-x64",
             "version": "[8.0.22, 8.0.22]"
           }
         ],
@@ -191,6 +229,19 @@
         },
         "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.100/PortableRuntimeIdentifierGraph.json"
       }
+    },
+    "runtimes": {
+      "win-x64": {
+        "#import": []
+      }
     }
-  }
+  },
+  "logs": [
+    {
+      "code": "NU1900",
+      "level": "Warning",
+      "warningLevel": 1,
+      "message": "获取包漏洞数据时出错: 无法加载源 https://api.nuget.org/v3/index.json 的服务索引。"
+    }
+  ]
 }

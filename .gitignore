@@ -16,3 +16,5 @@ Server/obj/
 # OS files
 Thumbs.db
 .DS_Store
+/Release
+/UI/build-resources

@@ -2,8 +2,12 @@ using CounterStrike2GSI;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Media;
+using System.Text;
 
 const int port = 10086;
+
+Console.OutputEncoding = Encoding.UTF8;
+Console.InputEncoding = Encoding.UTF8;
 
 string? mySteamID = null;
 string? myName = null;
@@ -11,9 +15,14 @@ string? myName = null;
 using var listener = new GameStateListener(port);
 
 // 音频通过json加载
-JObject config = JObject.Parse(File.ReadAllText("../config.json"));
+var configPath = Environment.GetEnvironmentVariable("TRIGGERPAD_CONFIG_PATH")
+    ?? Path.GetFullPath("../config.json", Directory.GetCurrentDirectory());
+var audioDirectory = Environment.GetEnvironmentVariable("TRIGGERPAD_AUDIO_PATH")
+    ?? Path.Combine(Path.GetDirectoryName(configPath)!, "audio");
+
+JObject config = JObject.Parse(File.ReadAllText(configPath));
 string DiedSoundName = config["PlayerDied"]?["AudioName"]?.Value<string>()?? "Null";
-var DiedSound = new SoundPlayer("../audio/" + DiedSoundName);
+var DiedSound = new SoundPlayer(Path.Combine(audioDirectory, DiedSoundName));
 
 // steamID加载
 void GetSteamID(GameState gameState)

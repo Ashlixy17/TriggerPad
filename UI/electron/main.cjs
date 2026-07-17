@@ -3,9 +3,10 @@ const { execFile, spawn } = require('child_process')
 const fs = require('fs/promises')
 const path = require('path')
 
-const configPath = path.join(__dirname, '..', '..', 'config.json')
-const audioPath = path.join(__dirname, '..', '..', 'audio')
-const serverPath = path.join(__dirname, '..', '..', 'Server')
+const developmentRoot = path.join(__dirname, '..', '..')
+let configPath
+let audioPath
+let serverPath
 const audioExtensions = new Set(['.wav', '.mp3', '.ogg', '.flac', '.m4a', '.aac', '.wma'])
 const settingKeys = new Set(['LaunchAtStartup', 'Theme', 'DefaultVolume', 'OutputDevice'])
 const readConfig = async () => JSON.parse(await fs.readFile(configPath, 'utf8'))
@@ -14,6 +15,33 @@ let serverProcess = null
 let gracefulStopTimer = null
 let exitAfterServerStops = false
 let allowAppQuit = false
+
+function configureRuntimePaths() {
+  if (app.isPackaged) {
+    const runtimeRoot = path.join(app.getPath('userData'), 'runtime')
+    configPath = path.join(runtimeRoot, 'config.json')
+    audioPath = path.join(runtimeRoot, 'audio')
+    serverPath = path.join(process.resourcesPath, 'server')
+  } else {
+    configPath = path.join(developmentRoot, 'config.json')
+    audioPath = path.join(developmentRoot, 'audio')
+    serverPath = path.join(developmentRoot, 'Server')
+  }
+}
+
+async function initializeRuntimeData() {
+  if (!app.isPackaged) return
+  const defaultsRoot = path.join(process.resourcesPath, 'defaults')
+  await fs.mkdir(audioPath, { recursive: true })
+  try { await fs.access(configPath) } catch { await fs.copyFile(path.join(defaultsRoot, 'config.json'), configPath) }
+  const defaultAudioPath = path.join(defaultsRoot, 'audio')
+  try {
+    await fs.access(defaultAudioPath)
+    await fs.cp(defaultAudioPath, audioPath, { recursive: true, force: false, errorOnExist: false })
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error
+  }
+}
 
 function sendServerLog(level, message) {
   const text = String(message).trim()
@@ -41,6 +69,7 @@ function requestServerStop({ quitApp = false } = {}) {
 }
 
 function clearResidualServerProcesses() {
+  if (app.isPackaged) return Promise.resolve()
   const serverBin = path.join(serverPath, 'bin').replace(/'/g, "''")
   const command = `$root = '${serverBin}'; $targets = @(Get-Process -Name TriggerPad -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase) }); $targets | Stop-Process -Force; $targets.Count`
   return new Promise(resolve => {
@@ -129,7 +158,15 @@ ipcMain.handle('server:start', async () => {
   try {
     await fs.access(serverPath)
     await clearResidualServerProcesses()
-    serverProcess = spawn('dotnet', ['run'], { cwd: serverPath, windowsHide: true, shell: false })
+    const serverOptions = {
+      cwd: serverPath,
+      windowsHide: true,
+      shell: false,
+      env: { ...process.env, TRIGGERPAD_CONFIG_PATH: configPath, TRIGGERPAD_AUDIO_PATH: audioPath }
+    }
+    serverProcess = app.isPackaged
+      ? spawn(path.join(serverPath, 'TriggerPad.Server.exe'), [], serverOptions)
+      : spawn('dotnet', ['run'], serverOptions)
     serverProcess.stdout.on('data', data => sendServerLog('INFO', data.toString('utf8')))
     serverProcess.stderr.on('data', data => sendServerLog('ERROR', data.toString('utf8')))
     serverProcess.on('error', error => sendServerLog('ERROR', `Unable to start Server: ${error.message}`))
@@ -146,7 +183,7 @@ ipcMain.handle('server:start', async () => {
       }
     })
     for (const win of BrowserWindow.getAllWindows()) win.webContents.send('server:status', { running: true })
-    sendServerLog('INFO', 'Starting Server: dotnet run')
+    sendServerLog('INFO', app.isPackaged ? 'Starting packaged Server.' : 'Starting Server: dotnet run')
     return { started: true }
   } catch (error) {
     sendServerLog('ERROR', `Server directory is unavailable: ${error.message}`)
@@ -179,7 +216,9 @@ const createWindow = () => {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  configureRuntimePaths()
+  await initializeRuntimeData()
   Menu.setApplicationMenu(null)
   createWindow()
   app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow())
