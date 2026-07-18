@@ -3,16 +3,20 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('triggerPad', {
   readConfig: () => ipcRenderer.invoke('config:read'),
   bindAudio: (callback, audioName) => ipcRenderer.invoke('config:bind-audio', { callback, audioName }),
+  setEventEnabled: (callback, enabled) => ipcRenderer.invoke('config:set-event-enabled', { callback, enabled }),
   updateSettings: changes => ipcRenderer.invoke('settings:update', changes),
   listAudio: () => ipcRenderer.invoke('audio:list'),
   readAudio: fileName => ipcRenderer.invoke('audio:read', fileName),
   importAudio: () => ipcRenderer.invoke('audio:import'),
+  renameAudio: (oldFileName, newFileName) => ipcRenderer.invoke('audio:rename', { oldFileName, newFileName }),
   removeAudio: fileName => ipcRenderer.invoke('audio:remove', fileName),
   clearAudio: () => ipcRenderer.invoke('audio:clear'),
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
   isMaximizedWindow: () => ipcRenderer.invoke('window:is-maximized'),
+  isAlwaysOnTop: () => ipcRenderer.invoke('window:is-always-on-top'),
   getAccentColor: () => ipcRenderer.invoke('window:get-accent-color'),
   toggleMaximizeWindow: () => ipcRenderer.invoke('window:toggle-maximize'),
+  toggleAlwaysOnTop: () => ipcRenderer.invoke('window:toggle-always-on-top'),
   closeWindow: () => ipcRenderer.invoke('window:close'),
   startServer: () => ipcRenderer.invoke('server:start'),
   stopServer: () => ipcRenderer.invoke('server:stop'),
@@ -30,5 +34,10 @@ contextBridge.exposeInMainWorld('triggerPad', {
     const listener = (_event, maximized) => callback(Boolean(maximized))
     ipcRenderer.on('window:maximized', listener)
     return () => ipcRenderer.removeListener('window:maximized', listener)
+  },
+  onWindowAlwaysOnTop: callback => {
+    const listener = (_event, alwaysOnTop) => callback(Boolean(alwaysOnTop))
+    ipcRenderer.on('window:always-on-top', listener)
+    return () => ipcRenderer.removeListener('window:always-on-top', listener)
   }
 })

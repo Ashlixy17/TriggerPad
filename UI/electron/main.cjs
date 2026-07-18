@@ -10,9 +10,10 @@ let serverPath
 let iconPath
 const audioExtensions = new Set(['.wav', '.mp3', '.ogg', '.flac', '.m4a', '.aac', '.wma'])
 const fallbackAccentColor = '#3d82f5'
-const settingKeys = new Set(['LaunchAtStartup', 'Theme', 'DefaultVolume', 'OutputDevice'])
+const settingKeys = new Set(['LaunchAtStartup', 'Theme', 'DefaultVolume', 'OutputDevice', 'SmoothScroll'])
 const readConfig = async () => JSON.parse(await fs.readFile(configPath, 'utf8'))
 const isAudioFile = fileName => audioExtensions.has(path.extname(fileName).toLowerCase())
+const isSafeAudioFileName = fileName => typeof fileName === 'string' && fileName.length > 0 && path.basename(fileName) === fileName && isAudioFile(fileName) && !/[<>:"/\\|?*\u0000-\u001f]/.test(fileName) && !/[. ]$/.test(fileName)
 function readAccentColor() {
   if (process.platform === 'win32') {
     try {
@@ -133,6 +134,13 @@ ipcMain.handle('config:bind-audio', async (_event, { callback, audioName }) => {
   await fs.writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8')
   return config
 })
+ipcMain.handle('config:set-event-enabled', async (_event, { callback, enabled }) => {
+  const config = await readConfig()
+  if (!config[callback] || typeof config[callback] !== 'object') throw new Error(`Unknown event callback: ${callback}`)
+  config[callback].Enabled = Boolean(enabled)
+  await fs.writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8')
+  return config[callback]
+})
 ipcMain.handle('settings:update', async (_event, changes) => {
   const config = await readConfig()
   config.Settings = config.Settings || {}
@@ -166,6 +174,27 @@ ipcMain.handle('audio:import', async event => {
   }
   return { canceled: false, files: await listAudio() }
 })
+ipcMain.handle('audio:rename', async (_event, { oldFileName, newFileName }) => {
+  if (!isSafeAudioFileName(oldFileName) || !isSafeAudioFileName(newFileName)) throw new Error('Invalid audio file name')
+  if (path.extname(oldFileName).toLowerCase() !== path.extname(newFileName).toLowerCase()) throw new Error('Audio file extension cannot be changed')
+  if (oldFileName === newFileName) return { files: await listAudio() }
+  const oldPath = path.join(audioPath, oldFileName)
+  const newPath = path.join(audioPath, newFileName)
+  try { await fs.access(newPath); throw new Error('An audio file with that name already exists') } catch (error) {
+    if (error?.code !== 'ENOENT') throw error
+  }
+  await fs.rename(oldPath, newPath)
+  const config = await readConfig()
+  let changed = false
+  for (const [key, value] of Object.entries(config)) {
+    if (key !== 'Settings' && value && typeof value === 'object' && value.AudioName === oldFileName) {
+      value.AudioName = newFileName
+      changed = true
+    }
+  }
+  if (changed) await fs.writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8')
+  return { files: await listAudio() }
+})
 ipcMain.handle('audio:remove', async (_event, fileName) => {
   if (!isAudioFile(fileName) || path.basename(fileName) !== fileName) throw new Error('Invalid audio file name')
   await fs.rm(path.join(audioPath, fileName), { force: true })
@@ -178,6 +207,7 @@ ipcMain.handle('audio:clear', async () => {
 })
 ipcMain.handle('window:minimize', event => BrowserWindow.fromWebContents(event.sender)?.minimize())
 ipcMain.handle('window:is-maximized', event => BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false)
+ipcMain.handle('window:is-always-on-top', event => BrowserWindow.fromWebContents(event.sender)?.isAlwaysOnTop() ?? false)
 ipcMain.handle('window:get-accent-color', () => readAccentColor())
 ipcMain.handle('window:toggle-maximize', event => {
   const win = BrowserWindow.fromWebContents(event.sender)
@@ -185,6 +215,14 @@ ipcMain.handle('window:toggle-maximize', event => {
   if (win.isMaximized()) win.unmaximize()
   else win.maximize()
   return win.isMaximized()
+})
+ipcMain.handle('window:toggle-always-on-top', event => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (!win) return false
+  const next = !win.isAlwaysOnTop()
+  win.setAlwaysOnTop(next)
+  win.webContents.send('window:always-on-top', next)
+  return next
 })
 ipcMain.handle('window:close', event => BrowserWindow.fromWebContents(event.sender)?.close())
 ipcMain.handle('server:start', async () => {
@@ -252,9 +290,11 @@ const createWindow = () => {
     const maximized = win.isMaximized()
     win.webContents.send('window:maximized', maximized)
   }
+  const broadcastTopState = () => win.webContents.send('window:always-on-top', win.isAlwaysOnTop())
   win.on('maximize', broadcastWindowState)
   win.on('unmaximize', broadcastWindowState)
   win.webContents.once('did-finish-load', broadcastWindowState)
+  win.webContents.once('did-finish-load', broadcastTopState)
   if (process.env.VITE_DEV_SERVER_URL) {
     win.loadURL(process.env.VITE_DEV_SERVER_URL)
   } else {
