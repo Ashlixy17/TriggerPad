@@ -1,8 +1,10 @@
+
 using CounterStrike2GSI;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.Media;
 using System.Text;
+using NAudio.Wave;
+using System.Runtime.CompilerServices;
 
 const int port = 10086;
 
@@ -14,15 +16,20 @@ string? myName = null;
 
 using var listener = new GameStateListener(port);
 
-// 音频通过json加载
+// 加载json
 var configPath = Environment.GetEnvironmentVariable("TRIGGERPAD_CONFIG_PATH")
     ?? Path.GetFullPath("../config.json", Directory.GetCurrentDirectory());
 var audioDirectory = Environment.GetEnvironmentVariable("TRIGGERPAD_AUDIO_PATH")
     ?? Path.Combine(Path.GetDirectoryName(configPath)!, "audio");
 
 JObject config = JObject.Parse(File.ReadAllText(configPath));
-string DiedSoundName = config["PlayerDied"]?["AudioName"]?.Value<string>()?? "Null";
-var DiedSound = new SoundPlayer(Path.Combine(audioDirectory, DiedSoundName));
+
+// 音频播放函数
+void PlayAudio()
+{
+    
+}
+
 
 // steamID加载
 void GetSteamID(GameState gameState)
@@ -41,16 +48,12 @@ listener.NewGameState += GetSteamID;
 // 回调使用
 listener.PlayerDied += gameEvent =>
 {
-    if(DiedSoundName != "")
-    {
-        DiedSound.Play();
-        Console.WriteLine($"{DiedSoundName}已成功播放");
-    }
 };
 listener.PlayerFlashAmountChanged += gameEvent =>
 {
-    
 };
+
+
 
 // 创建cs配置文件
 if (listener.GenerateGSIConfigFile("trigger"))

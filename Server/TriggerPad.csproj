@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="NAudio" Version="2.3.0" />
     <PackageReference Include="System.Windows.Extensions" Version="10.0.9" />
     <Reference Include="CounterStrike2GSI">
       <HintPath>CounterStrike2GSI.dll</HintPath>
