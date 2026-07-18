@@ -1,7 +1,7 @@
 {
   "Settings": {
     "LaunchAtStartup": false,
-    "Theme": "dark",
+    "Theme": "light",
     "DefaultVolume": 100,
     "OutputDevice": "default"
   },
