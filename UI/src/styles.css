@@ -295,7 +295,7 @@ body .theme-light .native-check:checked {
 .toast-close { width: 24px; height: 24px; margin-left: auto; border: 0; border-radius: 2px; color: #c4cbd0; background: transparent; opacity: 0; font-size: 17px; line-height: 1; }
 .save-toast:hover .toast-close, .toast-close:focus-visible { opacity: 1; }
 .toast-close:hover { color: #fff; background: #555; }
-.toast-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--accent-color); transform-origin: center; animation: toast-countdown 5s linear forwards; }
+.toast-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--accent-color); transform-origin: center; animation: toast-countdown 3s linear forwards; }
 .save-toast:hover .toast-progress { animation-play-state: paused; }
 @keyframes toast-slide-in { from { opacity: 0; transform: translateX(110%); } to { opacity: 1; transform: translateX(0); } }
 @keyframes toast-slide-out { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(110%); } }

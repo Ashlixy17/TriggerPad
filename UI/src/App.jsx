@@ -509,7 +509,7 @@ function Toggle({ title, hint, value, setValue }) { return <label className="tog
 function ToastStack({ toasts, onAutoClose, onRemove }) { return <div className="toast-stack" aria-live="polite">{toasts.map(toast => <Toast key={toast.id} toast={toast} onAutoClose={() => onAutoClose(toast.id)} onRemove={() => onRemove(toast.id)} />)}</div> }
 function Toast({ toast, onAutoClose, onRemove }) {
   const timerRef = useRef(null)
-  const remainingRef = useRef(5000)
+  const remainingRef = useRef(3000)
   const startedRef = useRef(0)
 
   const startTimer = () => {
