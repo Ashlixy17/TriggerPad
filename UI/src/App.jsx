@@ -242,7 +242,6 @@ export default function App() {
       const saved = await window.triggerPad?.updateEventAudio?.(callback, changes)
       if (saved) setEvents(items => items.map(item => item.callback === callback ? { ...item, ...saved } : item))
       addLog('INFO', `${callback} 的事件音量设置已保存。`)
-      showToast('设置已保存')
       return true
     } catch (error) {
       setEvents(items => items.map(item => item.callback === callback ? { ...item, ...previous } : item))
@@ -276,7 +275,7 @@ export default function App() {
       await window.triggerPad?.bindAudio(selectedEvent.callback, audioSelection)
       setEvents(items => items.map(item => item.callback === selectedEvent.callback ? { ...item, AudioName: audioSelection } : item))
       addLog('INFO', `${selectedEvent.callback} 已绑定 ${audioSelection}。`)
-      showToast('保存绑定成功')
+      showToast('绑定成功')
     } catch (error) { addLog('ERROR', `保存音频绑定失败：${error.message}`) }
   }
   const testAudio = async () => {
