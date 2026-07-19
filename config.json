@@ -9,90 +9,90 @@
     "Trigger": "玩家死亡",
     "Condition": "当玩家死亡时触发",
     "AudioName": "戳一下.wav",
-    "IsActive": true
+    "Enabled": false
   },
   "PlayerFlashAmountChanged": {
     "Trigger": "玩家被闪",
     "Condition": "当玩家受到闪光弹影响时触发",
     "AudioName": null,
-    "IsActive": true
+    "Enabled": false
   },
   "PlayerSmokedAmountChanged": {
     "Trigger": "玩家混烟",
     "Condition": "当玩家受到烟雾影响时触发",
     "AudioName": null,
-    "IsActive": true
+    "Enabled": false
   },
   "PlayerBurningAmountChanged": {
     "Trigger": "玩家被燃烧弹伤害",
     "Condition": "当玩家受到燃烧弹影响或伤害时触发",
     "AudioName": null,
-    "IsActive": true
+    "Enabled": false
   },
   "PlayerActiveWeaponChanged": {
     "Trigger": "玩家切换主武器",
     "Condition": "当玩家当前使用的武器发生变化时触发",
     "AudioName": null,
-    "IsActive": true
+    "Enabled": false
   },
   "PlayerWeaponsPickedUp": {
     "Trigger": "玩家拾取武器",
     "Condition": "当玩家拾取非刀、非拳套武器时触发",
     "AudioName": null,
-    "IsActive": true
+    "Enabled": false
   },
   "PlayerWeaponsDropped": {
     "Trigger": "玩家丢弃武器",
     "Condition": "当玩家丢弃武器或死亡时武器从背包中消失时触发",
     "AudioName": null,
-    "IsActive": true
+    "Enabled": false
   },
   "PlayerGotKill": {
     "Trigger": "玩家击杀敌人",
     "Condition": "当玩家本回合击杀数增加时触发",
     "AudioName": null,
-    "IsActive": true
+    "Enabled": false
   },
   "RoundConcluded": {
     "Trigger": "回合结算",
     "Condition": "当回合结束并进入下一回合时触发；可通过 RoundConclusionReason 区分时间到、全歼、炸弹爆炸或拆包获胜",
     "AudioName": null,
-    "IsActive": true
+    "Enabled": false
   },
   "BombExploded": {
     "Trigger": "炸弹爆炸",
     "Condition": "当 C4 安装后爆炸时触发，通常对应 T_Win_Bomb",
     "AudioName": null,
-    "IsActive": true
+    "Enabled": false
   },
   "BombPlanted":{
     "Trigger": "炸弹安放成功",
     "Condition": "当 C4 被成功安放时触发",
     "AudioName": null,
-    "IsActive": true
+    "Enabled": false
   },
   "BombDefused": {
     "Trigger": "炸弹拆除成功",
     "Condition": "当 C4 被成功拆除时触发",
     "AudioName": null,
-    "IsActive": true
+    "Enabled": false
   },
   "TeamRoundLoss": {
     "Trigger": "回合失败",
     "Condition": "当某支队伍输掉当前回合时触发；需结合 Team 字段筛选所属队伍",
     "AudioName": null,
-    "IsActive": true
+    "Enabled": false
   },
   "TeamRoundVictory": {
     "Trigger": "回合胜利",
     "Condition": "当某支队伍赢得当前回合时触发；需结合 Team 字段筛选所属队伍",
     "AudioName": null,
-    "IsActive": true
+    "Enabled": false
   },
   "Gameover": {
     "Trigger": "游戏结束",
     "Condition": "当比赛进入 Gameover 阶段时触发",
     "AudioName": null,
-    "IsActive": true
+    "Enabled": false
   }
 }

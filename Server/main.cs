@@ -1,194 +1,160 @@
-
 using CounterStrike2GSI;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text;
-using NAudio.Wave;
-using System.Runtime.CompilerServices;
-using System.Net.Http.Headers;
 
 const int port = 10086;
 
 Console.OutputEncoding = Encoding.UTF8;
 Console.InputEncoding = Encoding.UTF8;
 
-string? mySteamID = null;
-string? myName = null;
-
-using var listener = new GameStateListener(port);
-string curPlayerTeam = "T";
-
-// 加载json
 var configPath = Environment.GetEnvironmentVariable("TRIGGERPAD_CONFIG_PATH")
     ?? Path.GetFullPath("../config.json", Directory.GetCurrentDirectory());
+var eventStatePath = Environment.GetEnvironmentVariable("TRIGGERPAD_EVENT_STATE_PATH");
 var audioDirectory = Environment.GetEnvironmentVariable("TRIGGERPAD_AUDIO_PATH")
     ?? Path.Combine(Path.GetDirectoryName(configPath)!, "audio");
 
-
-// 音频播放函数
-var output = new WaveOutEvent();
-void PlayAudio(string eventName)
+if (args.Length > 0 && args[0] == "--audio-host")
 {
-    JObject config = JObject.Parse(File.ReadAllText(configPath));
-    if (config[eventName]?["isActive"]?.Value<bool>() ?? true)
-    {
-        var audioName = config[eventName]?["AudioName"]?.Value<string>()??null;
-        if(audioName == null || audioName =="")
-        {
-            Console.WriteLine($"事件 {eventName} 未绑定任何音频");
-            return;
-        }
-        var audio = new AudioFileReader("../audio/"+audioName);
-        audio.Volume = (config["Settings"]?["DefaultVolume"]?.Value<float>()??100)/100.0f;
-        output.Init(audio);
-        output.Play();
-        Console.WriteLine($"音频{audioName}已经播放");
-        output.PlaybackStopped += (_, _) =>
-        {
-            output.Dispose();
-            audio.Dispose();
-        };
-    }
-    else
-    {
-        Console.WriteLine($"事件{eventName}已禁用");
-    }
-
+    AudioHost.Run(audioDirectory);
+    return;
 }
 
+string? mySteamID = null;
+string? myName = null;
+string currentPlayerTeam = "T";
+using var listener = new GameStateListener(port);
+using var audioEngine = new AudioEngine();
 
-// steamID加载
+audioEngine.StateChanged += state =>
+{
+    if (state.Channel.StartsWith("event:", StringComparison.Ordinal) && state.State == "error")
+        Console.Error.WriteLine($"播放 {state.FileName} 失败：{state.Message}");
+};
+
 void GetSteamID(GameState gameState)
 {
     var steamID = gameState.Player.SteamID;
-    if(steamID == null)
-    {
-        return;
-    }
+    if (steamID is null) return;
     mySteamID = steamID;
-    Console.WriteLine($"获取到steamID:{mySteamID}");
+    Console.WriteLine($"获取到 SteamID：{mySteamID}");
     listener.NewGameState -= GetSteamID;
 }
-listener.NewGameState += GetSteamID;
 
-// 回调使用
+void PlayConfiguredEvent(string callback)
+{
+    try
+    {
+        var config = JObject.Parse(File.ReadAllText(configPath));
+        var eventConfig = config[callback] is JObject configuredEvent ? (JObject)configuredEvent.DeepClone() : null;
+        if (eventConfig is not null && !string.IsNullOrWhiteSpace(eventStatePath) && File.Exists(eventStatePath))
+        {
+            try
+            {
+                var savedState = JObject.Parse(File.ReadAllText(eventStatePath));
+                if (savedState["events"]?[callback] is JObject savedEvent) eventConfig.Merge(savedEvent);
+            }
+            catch (Exception error)
+            {
+                Console.Error.WriteLine($"读取事件缓存失败，已使用默认禁用状态：{error.Message}");
+                eventConfig["Enabled"] = false;
+            }
+        }
+        if (eventConfig is null || eventConfig["Enabled"]?.Value<bool>() != true) return;
+
+        var audioName = eventConfig["AudioName"]?.Value<string>();
+        if (string.IsNullOrWhiteSpace(audioName)) return;
+
+        var settings = config["Settings"] as JObject;
+        var defaultVolume = Math.Clamp(settings?["DefaultVolume"]?.Value<int>() ?? 100, 0, 100);
+        var useCustomVolume = eventConfig["UseCustomVolume"]?.Value<bool>() == true;
+        var volume = useCustomVolume
+            ? Math.Clamp(eventConfig["TriggerVolume"]?.Value<int>() ?? defaultVolume, 0, 100)
+            : defaultVolume;
+        var outputDevice = settings?["OutputDevice"]?.Value<string>() ?? "default";
+        var result = audioEngine.Play($"event:{callback}", Path.Combine(audioDirectory, audioName), volume, outputDevice);
+        if (result.UsedFallback) Console.WriteLine($"输出设备不可用，已回退到默认设备：{result.DeviceName}");
+        Console.WriteLine($"{audioName} 已使用 {volume}% 音量播放");
+    }
+    catch (Exception error)
+    {
+        Console.Error.WriteLine($"事件 {callback} 播放失败：{error.Message}");
+    }
+}
+
+listener.NewGameState += GetSteamID;
 listener.PlayerDied += gameEvent =>
 {
-    PlayAudio("PlayerDied");
-    Console.WriteLine($"{gameEvent.Player.Name}已死亡");
-    
+    PlayConfiguredEvent("PlayerDied");
+    Console.WriteLine($"{gameEvent.Player.Name} 已死亡");
 };
 listener.PlayerFlashAmountChanged += gameEvent =>
 {
-    if(gameEvent.New == 1) 
-    { 
-        PlayAudio("PlayerFlashAmountChanged"); 
-    }
+    if (gameEvent.New == 1) PlayConfiguredEvent("PlayerFlashAmountChanged");
 };
 listener.PlayerSmokedAmountChanged += gameEvent =>
 {
-    if(gameEvent.New > 90)
-    {
-        PlayAudio("PlayerSmokedAmountChanged");
-    }  
+    if (gameEvent.New > 90) PlayConfiguredEvent("PlayerSmokedAmountChanged");
 };
 listener.PlayerBurningAmountChanged += gameEvent =>
 {
-    if(gameEvent.New > 100)
-    {
-        PlayAudio("PlayBurningAmountChanged");
-    }
+    if (gameEvent.New > 100) PlayConfiguredEvent("PlayerBurningAmountChanged");
 };
 listener.PlayerActiveWeaponChanged += gameEvent =>
 {
-    PlayAudio("PlayerActiveWeaponChanged");  
-    Console.WriteLine($"更换主武器为{gameEvent.New.Name}");
+    PlayConfiguredEvent("PlayerActiveWeaponChanged");
+    Console.WriteLine($"当前武器已更换为 {gameEvent.New.Name}");
 };
-listener.PlayerWeaponsPickedUp += gameEvent =>
+listener.PlayerWeaponsPickedUp += _ =>
 {
-    PlayAudio("PlayerWeaponsPickedUp");
-    Console.WriteLine($"捡起武器");
+    PlayConfiguredEvent("PlayerWeaponsPickedUp");
+    Console.WriteLine("已拾取武器");
 };
-listener.PlayerWeaponsDropped += gameEvent =>
+listener.PlayerWeaponsDropped += _ =>
 {
-    PlayAudio("PlayerWeaponsDropped");
-    Console.WriteLine($"丢出武器");  
+    PlayConfiguredEvent("PlayerWeaponsDropped");
+    Console.WriteLine("已丢弃武器");
 };
-listener.PlayerGotKill += gameEvent =>
+listener.PlayerGotKill += _ => PlayConfiguredEvent("PlayerGotKill");
+listener.RoundConcluded += _ => PlayConfiguredEvent("RoundConcluded");
+listener.BombExploded += _ => PlayConfiguredEvent("BombExploded");
+listener.BombPlanted += _ =>
 {
-    PlayAudio("PlayerGotKill");  
+    PlayConfiguredEvent("BombPlanted");
+    Console.WriteLine("C4 已安放");
 };
-listener.RoundConcluded += gameEvent =>
+listener.BombDefused += _ =>
 {
-    PlayAudio("RoundConcluded");
-};
-listener.BombExploded += gameEvent =>
-{
-    PlayAudio("BombExploded");  
-};
-listener.BombPlanted += gameEvent =>
-{
-    PlayAudio("BombPlanted");
-    Console.WriteLine("C4已安放");
-};
-listener.BombDefused += gameEvent =>
-{
-    PlayAudio("BombDefused");
-    Console.WriteLine("C4已拆除");  
+    PlayConfiguredEvent("BombDefused");
+    Console.WriteLine("C4 已拆除");
 };
 listener.PlayerTeamChanged += gameEvent =>
 {
-    curPlayerTeam = gameEvent.New.ToString();
-    Console.WriteLine($"当前回合改变，玩家阵营为{gameEvent.New}"); 
+    currentPlayerTeam = gameEvent.New.ToString();
+    Console.WriteLine($"玩家阵营已变更为 {currentPlayerTeam}");
 };
 listener.TeamRoundLoss += gameEvent =>
 {
-    if(curPlayerTeam == gameEvent.Team.ToString())
-    {
-        PlayAudio("TeamRoundLoss");
-        Console.WriteLine("回合失败");
-    }
+    if (currentPlayerTeam != gameEvent.Team.ToString()) return;
+    PlayConfiguredEvent("TeamRoundLoss");
+    Console.WriteLine("本方回合失败");
 };
 listener.TeamRoundVictory += gameEvent =>
 {
-    if(curPlayerTeam == gameEvent.Team.ToString())
-    {
-        PlayAudio("TeamRoundVictory");
-        Console.WriteLine("回合胜利");
-    }
+    if (currentPlayerTeam != gameEvent.Team.ToString()) return;
+    PlayConfiguredEvent("TeamRoundVictory");
+    Console.WriteLine("本方回合胜利");
 };
-listener.Gameover += gameEvent =>
-{
-    PlayAudio("GameOver");  
-};
+listener.Gameover += _ => PlayConfiguredEvent("Gameover");
 
-
-
-// 创建cs配置文件
-if (listener.GenerateGSIConfigFile("trigger"))
-{
-    Console.WriteLine($"GSI 配置文件已生成");
-}
-// 启动监听
+if (listener.GenerateGSIConfigFile("trigger")) Console.WriteLine("GSI 配置文件已生成");
 if (listener.Start())
 {
     Console.WriteLine("GSI 监听已启动。");
-    Console.WriteLine($"当前账号id{mySteamID} 名称{myName}");
+    Console.WriteLine($"当前账号 ID {mySteamID}，名称 {myName}");
 }
 
 Console.WriteLine($"监听已启动：{listener.URI}");
 Console.WriteLine("启动 CS2 并进入对局；收到状态后会输出。按 Enter 停止。");
-
 Console.ReadLine();
 listener.Stop();
-
 Console.WriteLine("程序已退出");
-
-// """
-//     "PlayerDied":{
-//         "name" : "xxx"
-//     },
-//     "PickedWeapon":{
-//         "name" : "xxx"
-//     }
-// """

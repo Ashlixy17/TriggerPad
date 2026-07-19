@@ -4,13 +4,25 @@ contextBridge.exposeInMainWorld('triggerPad', {
   readConfig: () => ipcRenderer.invoke('config:read'),
   bindAudio: (callback, audioName) => ipcRenderer.invoke('config:bind-audio', { callback, audioName }),
   setEventEnabled: (callback, enabled) => ipcRenderer.invoke('config:set-event-enabled', { callback, enabled }),
+  updateEventAudio: (callback, changes) => ipcRenderer.invoke('config:update-event-audio', { callback, changes }),
   updateSettings: changes => ipcRenderer.invoke('settings:update', changes),
   listAudio: () => ipcRenderer.invoke('audio:list'),
+  listOutputDevices: () => ipcRenderer.invoke('audio:list-output-devices'),
+  playPreviewAudio: options => ipcRenderer.invoke('audio:preview-play', options),
+  stopPreviewAudio: channel => ipcRenderer.invoke('audio:preview-stop', channel),
   readAudio: fileName => ipcRenderer.invoke('audio:read', fileName),
   importAudio: () => ipcRenderer.invoke('audio:import'),
   renameAudio: (oldFileName, newFileName) => ipcRenderer.invoke('audio:rename', { oldFileName, newFileName }),
   removeAudio: fileName => ipcRenderer.invoke('audio:remove', fileName),
   clearAudio: () => ipcRenderer.invoke('audio:clear'),
+  listConverterInput: () => ipcRenderer.invoke('converter:list-input'),
+  listConverterOutput: () => ipcRenderer.invoke('converter:list-output'),
+  importConverterAudio: () => ipcRenderer.invoke('converter:import'),
+  removeConverterInput: fileName => ipcRenderer.invoke('converter:remove-input', fileName),
+  clearConverterInput: () => ipcRenderer.invoke('converter:clear-input'),
+  convertAudio: targetFormat => ipcRenderer.invoke('converter:convert', targetFormat),
+  clearConverterOutput: () => ipcRenderer.invoke('converter:clear-output'),
+  addConverterOutputToAudioPool: fileNames => ipcRenderer.invoke('converter:add-to-audio-pool', fileNames),
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
   isMaximizedWindow: () => ipcRenderer.invoke('window:is-maximized'),
   isAlwaysOnTop: () => ipcRenderer.invoke('window:is-always-on-top'),
@@ -29,6 +41,16 @@ contextBridge.exposeInMainWorld('triggerPad', {
     const listener = (_event, status) => callback(status)
     ipcRenderer.on('server:status', listener)
     return () => ipcRenderer.removeListener('server:status', listener)
+  },
+  onPreviewAudioState: callback => {
+    const listener = (_event, state) => callback(state)
+    ipcRenderer.on('audio:preview-state', listener)
+    return () => ipcRenderer.removeListener('audio:preview-state', listener)
+  },
+  onConverterProgress: callback => {
+    const listener = (_event, update) => callback(update)
+    ipcRenderer.on('converter:progress', listener)
+    return () => ipcRenderer.removeListener('converter:progress', listener)
   },
   onWindowMaximized: callback => {
     const listener = (_event, maximized) => callback(Boolean(maximized))

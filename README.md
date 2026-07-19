@@ -5,7 +5,7 @@
 TriggerPad 是一个面向 Counter-Strike 2（CS2）的事件驱动音频触发工具。它通过 Valve Game State Integration（GSI）监听游戏状态，将游戏事件与用户导入的本地音频关联起来，在事件发生时自动播放音频。
 
 > [!CAUTION]
-> 当前版本是 v0.1.0-alpha 原型，
+> 当前版本是 v0.1.0，
 > 已经打通了“导入音频 → 选择事件 → 绑定音频 → 启动 GSI 监听”的基础演示流程。目前服务端真正接入的可执行事件是 `PlayerDied`（玩家死亡）；`PlayerFlashAmountChanged`（玩家被闪）已在配置和界面中预留，但尚未实现动作执行。
 
 ## 亮点功能
