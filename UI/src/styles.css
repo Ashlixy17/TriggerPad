@@ -241,18 +241,30 @@ button { cursor: pointer; }
 .settings-section .help-body { padding: 18px 20px 20px; }
 .settings-section .help-steps { margin-top: 18px; }
 
-/* Tool page reserves the desktop layout for the upcoming audio converter. */
+/* Three-column converter workspace. */
 .tools-panel { height: 100%; display: flex; flex-direction: column; }
 .tools-body { flex: 1; min-height: 0; overflow: auto; padding: 18px; }
-.tool-placeholder { max-width: 760px; overflow: hidden; border: 1px solid #383838; border-radius: 4px; background: #1d1d1d; }
-.tool-placeholder-head { min-height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 18px; border-bottom: 1px solid #343434; }
-.tool-placeholder-head h1 { margin: 0 0 5px; color: #e7edef; font-size: 16px; font-weight: 500; }
-.tool-placeholder-head p { margin: 0; color: #89959c; font-size: 11px; line-height: 1.5; }
-.tool-placeholder-head > span { flex: 0 0 auto; padding: 4px 8px; border: 1px solid var(--accent-border); border-radius: 3px; color: var(--accent-color); background: var(--accent-muted); font-size: 11px; }
-.tool-reserved-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 16px 18px 18px; }
-.tool-reserved-fields > div { min-width: 0; min-height: 54px; display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 0 12px; border: 1px solid #343434; border-radius: 3px; background: #202020; }
-.tool-reserved-fields strong { color: #cfd7db; font-size: 12px; font-weight: 500; }
-.tool-reserved-fields span { overflow: hidden; color: #727e85; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.converter-layout { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 180px minmax(0, 1fr); gap: 14px; overflow: hidden; }
+.converter-pool { min-height: 0; display: flex; flex-direction: column; }
+.converter-pool .converter-list { flex: 1; min-height: 0; overflow: auto; padding: 2px 8px 8px; }
+.converter-input-item, .converter-output-item { min-height: 39px; display: grid; align-items: center; gap: 7px; padding: 5px 7px; border: 1px solid transparent; border-radius: 3px; color: #d8e1e5; font-size: 12px; }
+.converter-input-item { grid-template-columns: minmax(0, 1fr) auto 21px; padding-right: 2px; background: linear-gradient(90deg, var(--accent-muted) 0 var(--conversion-progress), transparent var(--conversion-progress) 100%); transition: background .18s ease; }
+.converter-input-item > span, .converter-output-item > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.converter-input-item:hover, .converter-output-item:hover { background-color: #292f35; }
+.converter-input-item.success { background-color: var(--accent-muted); }
+.converter-input-item.error { border-color: #915a5a; background: #34282a; }
+.converter-input-item small { color: #9eabb1; font-size: 10px; }
+.converter-input-item.success small { color: #6ccc9d; }
+.converter-input-item.error small { color: #e58b8b; }
+.converter-input-item .audio-action { display: grid; place-items: center; justify-self: end; width: 21px; height: 24px; padding: 0; border: 0; border-radius: 2px; color: #87939a; background: transparent; }
+.converter-input-item .audio-action:hover { color: var(--accent-color); background: var(--accent-muted); }
+.converter-output-item { grid-template-columns: 18px minmax(0, 1fr); cursor: pointer; }
+.converter-controls { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-width: 0; }
+.converter-start { width: 148px; min-width: 148px; height: 44px; min-height: 44px; padding: 0 12px; font-size: 14px; }
+.converter-target { width: 100%; display: grid; gap: 6px; color: #a0abb1; font-size: 12px; }
+.converter-target select { width: 100%; min-height: 35px; padding: 0 9px; color: #e0e7ea; border: 1px solid #505960; border-radius: 4px; background: #252a2f; outline: none; }
+.converter-target select:focus { border-color: var(--accent-color); box-shadow: 0 0 0 2px var(--accent-soft); }
+.converter-target select:disabled { cursor: not-allowed; opacity: .45; }
 
 /* Session-only always-on-top control. */
 .window-controls .pin-window::before { content: "\E718"; }
@@ -276,13 +288,11 @@ button { cursor: pointer; }
 .theme-light .settings-nav-list button { color: #59656b; }
 .theme-light .settings-nav-list button:hover { color: #2d3338; background: #f0f1f2; }
 .theme-light .settings-nav-list button.active { color: var(--accent-color); background: var(--accent-muted); }
-.theme-light .tool-placeholder { border-color: #d8dadd; background: #fafafa; }
-.theme-light .tool-placeholder-head { border-color: #e3e5e7; }
-.theme-light .tool-placeholder-head h1 { color: #30383d; }
-.theme-light .tool-placeholder-head p { color: #737e84; }
-.theme-light .tool-reserved-fields > div { border-color: #e3e5e7; background: #fff; }
-.theme-light .tool-reserved-fields strong { color: #3c464c; }
-.theme-light .tool-reserved-fields span { color: #879197; }
+.theme-light .converter-input-item, .theme-light .converter-output-item { color: #3c464c; }
+.theme-light .converter-input-item:hover, .theme-light .converter-output-item:hover { background-color: #f3f6fa; }
+.theme-light .converter-input-item.error { border-color: #d6a4a4; background: #fff3f3; }
+.theme-light .converter-target { color: #5f6a70; }
+.theme-light .converter-target select { color: #30383d; border-color: #cbd0d4; background: #fff; }
 .theme-light .event-status.disabled-status { color: #9ba3a8; }
 .theme-light .save-toast { border-color: #d0d3d6; color: #2d3338; background: #fff; box-shadow: 0 5px 14px rgba(0, 0, 0, .14); }
 .theme-light .toast-close { color: #697279; }
@@ -324,8 +334,12 @@ button { cursor: pointer; }
 .theme-light .audio-item button.audio-action.audio-delete:hover { color: var(--accent-color); background: var(--accent-muted); }
 
 /* Event-specific volume uses a compact checkbox without overlapping its label. */
+.field:has(.event-volume-label) { grid-template-columns: 128px minmax(0, 1fr); }
 .event-volume-label { display: inline-flex; align-items: center; gap: 7px; min-width: 0; white-space: nowrap; }
 .event-volume-label .native-check { width: 16px; height: 16px; min-width: 16px; min-height: 16px; }
+.field input[type="range"] { padding: 0; border: 0; border-radius: 0; background: transparent; outline: none; box-shadow: none; }
+.field input[type="range"]:focus, .field input[type="range"]:focus-visible { border: 0; outline: none; box-shadow: none; }
+.field input[type="range"]:not(:disabled):hover, .field input[type="range"]:not(:disabled):focus { filter: brightness(1.18); }
 .field input[type="range"]:disabled { cursor: not-allowed; filter: grayscale(1); opacity: .42; }
 
 /* Windows CMD/PowerShell-style log console. The console stays dark in both app themes. */
