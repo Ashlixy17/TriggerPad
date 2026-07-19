@@ -20,6 +20,7 @@ if (args.Length > 0 && args[0] == "--audio-host")
 
 string? mySteamID = null;
 string? myName = null;
+string currentPlayerTeam = "T";
 using var listener = new GameStateListener(port);
 using var audioEngine = new AudioEngine();
 
@@ -67,8 +68,69 @@ void PlayConfiguredEvent(string callback)
 }
 
 listener.NewGameState += GetSteamID;
-listener.PlayerDied += _ => PlayConfiguredEvent("PlayerDied");
-listener.PlayerFlashAmountChanged += _ => { };
+listener.PlayerDied += gameEvent =>
+{
+    PlayConfiguredEvent("PlayerDied");
+    Console.WriteLine($"{gameEvent.Player.Name} 已死亡");
+};
+listener.PlayerFlashAmountChanged += gameEvent =>
+{
+    if (gameEvent.New == 1) PlayConfiguredEvent("PlayerFlashAmountChanged");
+};
+listener.PlayerSmokedAmountChanged += gameEvent =>
+{
+    if (gameEvent.New > 90) PlayConfiguredEvent("PlayerSmokedAmountChanged");
+};
+listener.PlayerBurningAmountChanged += gameEvent =>
+{
+    if (gameEvent.New > 100) PlayConfiguredEvent("PlayerBurningAmountChanged");
+};
+listener.PlayerActiveWeaponChanged += gameEvent =>
+{
+    PlayConfiguredEvent("PlayerActiveWeaponChanged");
+    Console.WriteLine($"当前武器已更换为 {gameEvent.New.Name}");
+};
+listener.PlayerWeaponsPickedUp += _ =>
+{
+    PlayConfiguredEvent("PlayerWeaponsPickedUp");
+    Console.WriteLine("已拾取武器");
+};
+listener.PlayerWeaponsDropped += _ =>
+{
+    PlayConfiguredEvent("PlayerWeaponsDropped");
+    Console.WriteLine("已丢弃武器");
+};
+listener.PlayerGotKill += _ => PlayConfiguredEvent("PlayerGotKill");
+listener.RoundConcluded += _ => PlayConfiguredEvent("RoundConcluded");
+listener.BombExploded += _ => PlayConfiguredEvent("BombExploded");
+listener.BombPlanted += _ =>
+{
+    PlayConfiguredEvent("BombPlanted");
+    Console.WriteLine("C4 已安放");
+};
+listener.BombDefused += _ =>
+{
+    PlayConfiguredEvent("BombDefused");
+    Console.WriteLine("C4 已拆除");
+};
+listener.PlayerTeamChanged += gameEvent =>
+{
+    currentPlayerTeam = gameEvent.New.ToString();
+    Console.WriteLine($"玩家阵营已变更为 {currentPlayerTeam}");
+};
+listener.TeamRoundLoss += gameEvent =>
+{
+    if (currentPlayerTeam != gameEvent.Team.ToString()) return;
+    PlayConfiguredEvent("TeamRoundLoss");
+    Console.WriteLine("本方回合失败");
+};
+listener.TeamRoundVictory += gameEvent =>
+{
+    if (currentPlayerTeam != gameEvent.Team.ToString()) return;
+    PlayConfiguredEvent("TeamRoundVictory");
+    Console.WriteLine("本方回合胜利");
+};
+listener.Gameover += _ => PlayConfiguredEvent("Gameover");
 
 if (listener.GenerateGSIConfigFile("trigger")) Console.WriteLine("GSI 配置文件已生成");
 if (listener.Start())
