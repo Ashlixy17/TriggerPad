@@ -156,6 +156,8 @@ button { cursor: pointer; }
 .settings-grid .toggle-row { min-width: 0; padding: 0 0 14px; }
 .settings-grid .toggle-row > div { min-width: 0; overflow: hidden; }
 .settings-grid .toggle-row small { overflow-wrap: anywhere; }
+.settings-form-list .toggle-row { pointer-events: none; cursor: default; }
+.settings-form-list .toggle-row .switch { pointer-events: auto; }
 .settings-grid .field { min-width: 0; grid-template-columns: minmax(105px, 140px) minmax(0, 1fr); }
 .settings-grid .field > * { min-width: 0; max-width: 100%; }
 .settings-grid .field input[type="range"] { width: 100%; min-width: 0; }
