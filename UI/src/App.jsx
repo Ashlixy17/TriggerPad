@@ -144,7 +144,6 @@ export default function App() {
     setAudio(files)
     setAudioEnabled(current => Object.fromEntries(files.map(item => [item.fileName, current[item.fileName] !== false])))
   }
-
   const loadAudio = async () => {
     try { syncAudioState(await window.triggerPad?.listAudio() || []) }
     catch (error) { addLog('ERROR', `读取音频目录失败：${error.message}`) }
@@ -187,12 +186,6 @@ export default function App() {
     const removeMaxListener = window.triggerPad?.onWindowMaximized?.(setIsMaximized)
     const removeTopListener = window.triggerPad?.onWindowAlwaysOnTop?.(setIsAlwaysOnTop)
     return () => { mounted = false; removeMaxListener?.(); removeTopListener?.() }
-  }, [])
-  useEffect(() => {
-    let mounted = true
-    window.triggerPad?.isMaximizedWindow?.().then(value => { if (mounted) setIsMaximized(Boolean(value)) })
-    const removeWindowStateListener = window.triggerPad?.onWindowMaximized?.(setIsMaximized)
-    return () => { mounted = false; removeWindowStateListener?.() }
   }, [])
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
