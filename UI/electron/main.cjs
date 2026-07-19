@@ -5,6 +5,7 @@ const path = require('path')
 
 const developmentRoot = path.join(__dirname, '..', '..')
 let configPath
+let eventStatePath
 let audioPath
 let serverPath
 let iconPath
@@ -12,7 +13,59 @@ let developmentServerAssembly
 const audioExtensions = new Set(['.wav', '.mp3', '.ogg', '.flac', '.m4a', '.aac', '.wma'])
 const fallbackAccentColor = '#3d82f5'
 const settingKeys = new Set(['LaunchAtStartup', 'Theme', 'DefaultVolume', 'OutputDevice', 'SmoothScroll'])
-const readConfig = async () => JSON.parse(await fs.readFile(configPath, 'utf8'))
+const eventStateKeys = new Set(['AudioName', 'Enabled', 'UseCustomVolume', 'TriggerVolume'])
+const readBaseConfig = async () => JSON.parse(await fs.readFile(configPath, 'utf8'))
+async function readEventState() {
+  try {
+    const state = JSON.parse(await fs.readFile(eventStatePath, 'utf8'))
+    if (!state || typeof state !== 'object' || !state.events || typeof state.events !== 'object' || Array.isArray(state.events)) return { version: 1, events: {} }
+    return state
+  } catch (error) {
+    if (error?.code !== 'ENOENT') sendServerLog('WARN', `Unable to read saved event state: ${error.message}`)
+    return { version: 1, events: {} }
+  }
+}
+async function writeEventState(state) {
+  await fs.mkdir(path.dirname(eventStatePath), { recursive: true })
+  await fs.writeFile(eventStatePath, `${JSON.stringify({ version: 1, events: state.events || {} }, null, 2)}\n`, 'utf8')
+}
+function extractEventState(config) {
+  const events = {}
+  for (const [callback, value] of Object.entries(config || {})) {
+    if (callback === 'Settings' || !value || typeof value !== 'object') continue
+    events[callback] = Object.fromEntries(Object.entries(value).filter(([key]) => eventStateKeys.has(key)))
+  }
+  return { version: 1, events }
+}
+async function initializeEventState() {
+  try { await fs.access(eventStatePath) } catch (error) {
+    if (error?.code !== 'ENOENT') throw error
+    await writeEventState(extractEventState(await readBaseConfig()))
+  }
+}
+async function readConfig() {
+  const config = await readBaseConfig()
+  const state = await readEventState()
+  for (const [callback, saved] of Object.entries(state.events || {})) {
+    if (!config[callback] || typeof config[callback] !== 'object' || !saved || typeof saved !== 'object') continue
+    for (const [key, value] of Object.entries(saved)) {
+      if (eventStateKeys.has(key)) config[callback][key] = value
+    }
+  }
+  return config
+}
+async function updateSavedEventState(callback, changes) {
+  const config = await readBaseConfig()
+  if (!config[callback] || typeof config[callback] !== 'object') throw new Error(`Unknown event callback: ${callback}`)
+  const state = await readEventState()
+  state.events = state.events || {}
+  state.events[callback] = state.events[callback] && typeof state.events[callback] === 'object' ? state.events[callback] : {}
+  for (const [key, value] of Object.entries(changes || {})) {
+    if (eventStateKeys.has(key)) state.events[callback][key] = value
+  }
+  await writeEventState(state)
+  return { ...config[callback], ...state.events[callback] }
+}
 const isAudioFile = fileName => audioExtensions.has(path.extname(fileName).toLowerCase())
 const isSafeAudioFileName = fileName => typeof fileName === 'string' && fileName.length > 0 && path.basename(fileName) === fileName && isAudioFile(fileName) && !/[<>:"/\\|?*\u0000-\u001f]/.test(fileName) && !/[. ]$/.test(fileName)
 function readAccentColor() {
@@ -46,6 +99,7 @@ let exitAfterServerStops = false
 let allowAppQuit = false
 
 function configureRuntimePaths() {
+  eventStatePath = path.join(app.getPath('userData'), 'event-state.json')
   iconPath = app.isPackaged
     ? path.join(process.resourcesPath, 'TriggerPad.ico')
     : path.join(developmentRoot, 'UI', 'build-resources', 'TriggerPad.ico')
@@ -67,7 +121,7 @@ function spawnServerExecutable(args = []) {
     cwd: serverPath,
     windowsHide: true,
     shell: false,
-    env: { ...process.env, TRIGGERPAD_CONFIG_PATH: configPath, TRIGGERPAD_AUDIO_PATH: audioPath }
+    env: { ...process.env, TRIGGERPAD_CONFIG_PATH: configPath, TRIGGERPAD_EVENT_STATE_PATH: eventStatePath, TRIGGERPAD_AUDIO_PATH: audioPath }
   }
   return app.isPackaged
     ? spawn(path.join(serverPath, 'TriggerPad.Server.exe'), args, options)
@@ -241,33 +295,24 @@ async function uniqueDestination(fileName) {
 
 ipcMain.handle('config:read', () => readConfig())
 ipcMain.handle('config:bind-audio', async (_event, { callback, audioName }) => {
-  const config = await readConfig()
-  if (!config[callback]) throw new Error(`Unknown event callback: ${callback}`)
-  config[callback].AudioName = audioName
-  await fs.writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8')
-  return config
+  await updateSavedEventState(callback, { AudioName: audioName })
+  return readConfig()
 })
 ipcMain.handle('config:set-event-enabled', async (_event, { callback, enabled }) => {
-  const config = await readConfig()
-  if (!config[callback] || typeof config[callback] !== 'object') throw new Error(`Unknown event callback: ${callback}`)
-  config[callback].Enabled = Boolean(enabled)
-  await fs.writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8')
-  return config[callback]
+  return updateSavedEventState(callback, { Enabled: Boolean(enabled) })
 })
 ipcMain.handle('config:update-event-audio', async (_event, { callback, changes }) => {
-  const config = await readConfig()
-  if (!config[callback] || typeof config[callback] !== 'object') throw new Error(`Unknown event callback: ${callback}`)
-  if (Object.prototype.hasOwnProperty.call(changes || {}, 'UseCustomVolume')) config[callback].UseCustomVolume = Boolean(changes.UseCustomVolume)
+  const normalized = {}
+  if (Object.prototype.hasOwnProperty.call(changes || {}, 'UseCustomVolume')) normalized.UseCustomVolume = Boolean(changes.UseCustomVolume)
   if (Object.prototype.hasOwnProperty.call(changes || {}, 'TriggerVolume')) {
     const volume = Number(changes.TriggerVolume)
     if (!Number.isFinite(volume)) throw new Error('Invalid trigger volume')
-    config[callback].TriggerVolume = Math.max(0, Math.min(100, Math.round(volume)))
+    normalized.TriggerVolume = Math.max(0, Math.min(100, Math.round(volume)))
   }
-  await fs.writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8')
-  return config[callback]
+  return updateSavedEventState(callback, normalized)
 })
 ipcMain.handle('settings:update', async (_event, changes) => {
-  const config = await readConfig()
+  const config = await readBaseConfig()
   config.Settings = config.Settings || {}
   for (const [key, value] of Object.entries(changes || {})) {
     if (settingKeys.has(key)) config.Settings[key] = value
@@ -333,15 +378,15 @@ ipcMain.handle('audio:rename', async (_event, { oldFileName, newFileName }) => {
   }
   await stopPreviewChannelsForFile(oldFileName)
   await fs.rename(oldPath, newPath)
-  const config = await readConfig()
+  const state = await readEventState()
   let changed = false
-  for (const [key, value] of Object.entries(config)) {
-    if (key !== 'Settings' && value && typeof value === 'object' && value.AudioName === oldFileName) {
+  for (const value of Object.values(state.events || {})) {
+    if (value && typeof value === 'object' && value.AudioName === oldFileName) {
       value.AudioName = newFileName
       changed = true
     }
   }
-  if (changed) await fs.writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8')
+  if (changed) await writeEventState(state)
   return { files: await listAudio() }
 })
 ipcMain.handle('audio:remove', async (_event, fileName) => {
@@ -449,6 +494,7 @@ const createWindow = () => {
 app.whenReady().then(async () => {
   configureRuntimePaths()
   await initializeRuntimeData()
+  await initializeEventState()
   Menu.setApplicationMenu(null)
   createWindow()
   app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow())

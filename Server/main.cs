@@ -9,6 +9,7 @@ Console.InputEncoding = Encoding.UTF8;
 
 var configPath = Environment.GetEnvironmentVariable("TRIGGERPAD_CONFIG_PATH")
     ?? Path.GetFullPath("../config.json", Directory.GetCurrentDirectory());
+var eventStatePath = Environment.GetEnvironmentVariable("TRIGGERPAD_EVENT_STATE_PATH");
 var audioDirectory = Environment.GetEnvironmentVariable("TRIGGERPAD_AUDIO_PATH")
     ?? Path.Combine(Path.GetDirectoryName(configPath)!, "audio");
 
@@ -44,7 +45,20 @@ void PlayConfiguredEvent(string callback)
     try
     {
         var config = JObject.Parse(File.ReadAllText(configPath));
-        var eventConfig = config[callback] as JObject;
+        var eventConfig = config[callback] is JObject configuredEvent ? (JObject)configuredEvent.DeepClone() : null;
+        if (eventConfig is not null && !string.IsNullOrWhiteSpace(eventStatePath) && File.Exists(eventStatePath))
+        {
+            try
+            {
+                var savedState = JObject.Parse(File.ReadAllText(eventStatePath));
+                if (savedState["events"]?[callback] is JObject savedEvent) eventConfig.Merge(savedEvent);
+            }
+            catch (Exception error)
+            {
+                Console.Error.WriteLine($"读取事件缓存失败，已使用默认禁用状态：{error.Message}");
+                eventConfig["Enabled"] = false;
+            }
+        }
         if (eventConfig is null || eventConfig["Enabled"]?.Value<bool>() != true) return;
 
         var audioName = eventConfig["AudioName"]?.Value<string>();
