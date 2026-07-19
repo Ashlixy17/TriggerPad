@@ -402,7 +402,7 @@ export default function App() {
   const accentStyle = { '--accent-color': accentColor, '--accent-soft': hexToRgba(accentColor, 0.16), '--accent-muted': hexToRgba(accentColor, 0.09), '--accent-border': hexToRgba(accentColor, 0.58) }
   return <div className={`app-shell theme-${activeTheme}`} style={accentStyle}>
     <header className="window-titlebar">
-      <div className="titlebar-drag" onDoubleClick={() => window.triggerPad?.toggleMaximizeWindow?.()}><div className="titlebar-mark"><img src="/TriggerPad.ico" alt="" /></div><strong>TriggerPad</strong><span className="titlebar-version">v0.1.0-alpha</span></div>
+      <div className="titlebar-drag" onDoubleClick={() => window.triggerPad?.toggleMaximizeWindow?.()}><div className="titlebar-mark"><img src="/TriggerPad.ico" alt="" /></div><strong>TriggerPad</strong><span className="titlebar-version">v0.1.0</span></div>
       <div className="window-controls" onDoubleClick={event => event.stopPropagation()}><button type="button" className={`pin-window ${isAlwaysOnTop ? 'active' : ''}`} title={isAlwaysOnTop ? '取消置顶' : '窗口置顶'} aria-label={isAlwaysOnTop ? '取消置顶' : '窗口置顶'} onClick={toggleAlwaysOnTop} /><button type="button" className="minimize-window" title="最小化" aria-label="最小化" onClick={() => window.triggerPad?.minimizeWindow?.()} /><button type="button" className={isMaximized ? 'restore-window' : 'maximize-window'} title={isMaximized ? '还原' : '最大化'} aria-label={isMaximized ? '还原' : '最大化'} onClick={() => window.triggerPad?.toggleMaximizeWindow?.()} /><button type="button" className="close-window" title="关闭" aria-label="关闭" onClick={() => window.triggerPad?.closeWindow?.()} /></div>
     </header>
     <nav className="tabs" aria-label="主导航">{[['events', '事件'], ['logs', '日志'], ['tools', '工具'], ['settings', '设置']].map(([id, text]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>{text}</button>)}</nav>
@@ -413,7 +413,7 @@ export default function App() {
         <aside className="audio-pool panel"><PanelHead title="音频池" /><div className="audio-pool-meta"><span>本地音频文件</span><strong>{audio.length}</strong></div><div className={`audio-list${scrollClass}`}>{audio.map(item => { const isPlaying = playingAudio === item.fileName || startingAudio === item.fileName; return <div className={`audio-item ${item.fileName === audioSelection ? 'selected' : ''} ${audioEnabled[item.fileName] === false ? 'disabled' : ''}`} key={item.fileName} onClick={() => { if (audioEnabled[item.fileName] !== false && editingAudio !== item.fileName) setAudioSelection(item.fileName) }}><input className="native-check audio-check" type="checkbox" checked={audioEnabled[item.fileName] !== false} onChange={event => { const enabled = event.target.checked; setAudioEnabled(current => ({ ...current, [item.fileName]: enabled })); if (!enabled && audioSelection === item.fileName) setAudioSelection('') }} onClick={event => event.stopPropagation()} aria-label={`${item.fileName} 可用于绑定`} />{editingAudio === item.fileName ? <form className="audio-rename-form" onSubmit={submitRenameAudio} onClick={event => event.stopPropagation()}><input className="audio-rename-input" value={renameValue} autoFocus disabled={renamingAudio} onChange={event => setRenameValue(event.target.value)} onBlur={() => { if (!renameCancelled.current) saveRenameAudio() }} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); void saveRenameAudio() } if (event.key === 'Escape') { event.preventDefault(); cancelRenameAudio() } }} onClick={event => event.stopPropagation()} aria-label="重命名音频文件" /></form> : <span title={item.fileName}>{item.fileName}</span>}<div className="audio-item-actions" onClick={event => event.stopPropagation()}><button type="button" className={`audio-action ${isPlaying ? 'audio-pause' : 'audio-play'}`} title={isPlaying ? '停止播放' : '播放音频'} aria-label={isPlaying ? '停止播放' : '播放音频'} onClick={() => playAudioFile(item.fileName)} /><button type="button" className="audio-action audio-rename" title="重命名音频" aria-label="重命名音频" disabled={renamingAudio} onClick={() => beginRenameAudio(item.fileName)} /><button type="button" className="audio-action audio-delete" title="移除音频" aria-label="移除音频" disabled={renamingAudio} onClick={() => removeSound(item.fileName)} /></div></div> })}{!audio.length && <p className="empty-state">还没有音频文件</p>}</div><div className="audio-actions"><button onClick={importAudio}>导入音频</button><button onClick={clearAudio}>清空</button></div></aside>
       </>}
       {tab === 'logs' && <div className="wide-view"><Logs logs={logs} onClear={() => setLogs([])} scrollClass={scrollClass} /></div>}
-      {tab === 'tools' && <div className="wide-view"><Tools scrollClass={scrollClass} /></div>}
+      {tab === 'tools' && <div className="wide-view"><Tools scrollClass={scrollClass} onAudioPoolChanged={loadAudio} onLog={addLog} onToast={showToast} /></div>}
       {tab === 'settings' && <div className="wide-view"><Settings settings={settings} outputDevices={outputDevices} onUpdate={updateSettings} /></div>}
     </main>
     <footer className={`app-footer ${tab === 'events' ? 'events-footer' : ''}`}>{tab === 'logs' && <StartControl running={running} onToggle={toggleRunning} />}<div className="status-strip"><Metric label="连接状态" value={running ? '已连接' : '未连接'} good={running} /><Metric label="事件源" value="CS2 GSI" /></div></footer>
@@ -502,7 +502,131 @@ function Settings({ settings, outputDevices, onUpdate }) {
   </div>
 }
 function HelpContent() { return <div className="help-body"><div className="help-hero"><span className="help-icon">?</span><div><h1>让游戏事件发出声音</h1><p>TriggerPad 通过 CS2 Game State Integration 监听游戏事件，并播放你绑定的本地音频。</p></div></div><div className="help-steps"><div><b>01</b><strong>导入音频</strong><span>在事件页右侧音频池导入 wav、mp3 等文件。</span></div><div><b>02</b><strong>绑定事件</strong><span>选择左侧事件，挑选音频后保存绑定。</span></div><div><b>03</b><strong>启动监听</strong><span>在事件页或日志页启动软件，开始接收 CS2 GSI 事件。</span></div></div></div> }
-function Tools({ scrollClass }) { return <section className="panel tools-panel"><PanelHead title="工具" /><div className={`tools-body${scrollClass}`}><section className="tool-placeholder" aria-labelledby="audio-converter-title"><div className="tool-placeholder-head"><div><h1 id="audio-converter-title">音频格式转换</h1><p>转换本地音频文件的格式，便于用于事件绑定。</p></div><span>功能开发中</span></div><div className="tool-reserved-fields" aria-label="音频格式转换预留区域"><div><strong>输入文件</strong><span>将在后续版本提供</span></div><div><strong>目标格式</strong><span>将在后续版本提供</span></div><div><strong>输出位置</strong><span>将在后续版本提供</span></div><div><strong>转换操作</strong><span>将在后续版本提供</span></div></div></section></div></section> }
+function Tools({ scrollClass, onAudioPoolChanged, onLog, onToast }) {
+  const [inputFiles, setInputFiles] = useState([])
+  const [outputFiles, setOutputFiles] = useState([])
+  const [outputSelected, setOutputSelected] = useState({})
+  const [targetFormat, setTargetFormat] = useState('')
+  const [converting, setConverting] = useState(false)
+  const [progressByFile, setProgressByFile] = useState({})
+
+  const syncOutputFiles = files => {
+    setOutputFiles(files)
+    setOutputSelected(current => Object.fromEntries(files.map(file => [file.fileName, current[file.fileName] !== false])))
+  }
+  const loadQueues = async () => {
+    const [inputs, outputs] = await Promise.all([
+      window.triggerPad?.listConverterInput?.() || [],
+      window.triggerPad?.listConverterOutput?.() || []
+    ])
+    setInputFiles(inputs)
+    syncOutputFiles(outputs)
+  }
+  useEffect(() => {
+    void loadQueues().catch(error => onLog('ERROR', `读取转换工具失败：${error.message}`))
+    const removeProgressListener = window.triggerPad?.onConverterProgress?.(update => {
+      if (!update?.fileName) return
+      setProgressByFile(current => ({ ...current, [update.fileName]: { state: update.state, progress: update.progress ?? 0, message: update.message || '' } }))
+    })
+    return () => removeProgressListener?.()
+  }, [])
+
+  const importInput = async () => {
+    try {
+      const result = await window.triggerPad?.importConverterAudio?.()
+      if (result?.files) {
+        setInputFiles(result.files)
+        if (!result.canceled) onLog('INFO', '待转换音频已导入。')
+      }
+    } catch (error) { onLog('ERROR', `导入待转换音频失败：${error.message}`) }
+  }
+  const removeInput = async fileName => {
+    try {
+      setInputFiles(await window.triggerPad?.removeConverterInput?.(fileName) || [])
+      setProgressByFile(current => { const next = { ...current }; delete next[fileName]; return next })
+    } catch (error) { onLog('ERROR', `移除待转换音频失败：${error.message}`) }
+  }
+  const clearInput = async () => {
+    try {
+      await window.triggerPad?.clearConverterInput?.()
+      setInputFiles([])
+      setProgressByFile({})
+    } catch (error) { onLog('ERROR', `清空待转换音频失败：${error.message}`) }
+  }
+  const startConversion = async () => {
+    if (!inputFiles.length || !targetFormat || converting) return
+    setConverting(true)
+    setProgressByFile(Object.fromEntries(inputFiles.map(file => [file.fileName, { state: 'queued', progress: 0, message: '' }])))
+    try {
+      const result = await window.triggerPad?.convertAudio?.(targetFormat)
+      setInputFiles(result?.inputFiles || inputFiles)
+      syncOutputFiles(result?.outputFiles || [])
+      if (result?.statuses) setProgressByFile(result.statuses)
+      const failed = Object.values(result?.statuses || {}).filter(status => status.state === 'error').length
+      onLog(failed ? 'WARN' : 'INFO', failed ? `转换完成，${failed} 个文件失败。` : '音频转换完成。')
+      onToast(failed ? '部分音频转换失败' : '音频转换完成')
+    } catch (error) {
+      onLog('ERROR', `音频转换失败：${error.message}`)
+      onToast('音频转换失败')
+    } finally { setConverting(false) }
+  }
+  const clearOutput = async () => {
+    try {
+      await window.triggerPad?.clearConverterOutput?.()
+      setOutputFiles([])
+      setOutputSelected({})
+    } catch (error) { onLog('ERROR', `清空转换结果失败：${error.message}`) }
+  }
+  const addSelectedOutput = async () => {
+    const selectedFiles = outputFiles.filter(file => outputSelected[file.fileName] !== false).map(file => file.fileName)
+    if (!selectedFiles.length) return
+    try {
+      await window.triggerPad?.addConverterOutputToAudioPool?.(selectedFiles)
+      await onAudioPoolChanged()
+      onLog('INFO', `已将 ${selectedFiles.length} 个转换结果加入音频池。`)
+      onToast('已加入音频池')
+    } catch (error) { onLog('ERROR', `加入音频池失败：${error.message}`) }
+  }
+  const selectedOutputCount = outputFiles.filter(file => outputSelected[file.fileName] !== false).length
+
+  return <section className="panel tools-panel">
+    <PanelHead title="音频格式转换器" />
+    <div className={`tools-body converter-layout${scrollClass}`}>
+      <section className="converter-pool panel" aria-labelledby="converter-input-title">
+        <PanelHead title="待转换音频" />
+        <div className="audio-pool-meta"><span>支持 MP3、WAV、M4A</span><strong>{inputFiles.length}</strong></div>
+        <div className="converter-list">
+          {inputFiles.map(file => {
+            const status = progressByFile[file.fileName]
+            const progress = Math.max(0, Math.min(100, status?.progress || 0))
+            return <div className={`converter-input-item ${status?.state || ''}`} key={file.fileName} style={{ '--conversion-progress': `${progress}%` }} title={status?.message || file.fileName}>
+              <span>{file.fileName}</span>
+              {status?.state === 'running' && <small>{progress}%</small>}
+              {status?.state === 'success' && <small>完成</small>}
+              {status?.state === 'error' && <small>失败</small>}
+              <button type="button" className="audio-action audio-delete" title="移除音频" aria-label="移除音频" disabled={converting} onClick={() => removeInput(file.fileName)} />
+            </div>
+          })}
+          {!inputFiles.length && <p className="empty-state">还没有待转换音频</p>}
+        </div>
+        <div className="audio-actions"><button disabled={converting} onClick={importInput}>导入音频</button><button disabled={converting || !inputFiles.length} onClick={clearInput}>清空</button></div>
+      </section>
+      <section className="converter-controls" aria-label="转换控制">
+        <button className="primary converter-start" disabled={converting || !inputFiles.length || !targetFormat} onClick={startConversion}>{converting ? '正在转换' : '开始转换'}</button>
+        <label className="converter-target"><span>目标格式</span><select value={targetFormat} disabled={converting} onChange={event => setTargetFormat(event.target.value)}><option value="">选择目标格式</option><option value="wav">WAV</option><option value="mp3">MP3</option><option value="m4a">M4A</option></select></label>
+      </section>
+      <section className="converter-pool panel" aria-labelledby="converter-output-title">
+        <PanelHead title="转换结果" />
+        <div className="audio-pool-meta"><span>勾选后加入事件音频池</span><strong>{outputFiles.length}</strong></div>
+        <div className="converter-list">
+          {outputFiles.map(file => <label className="converter-output-item" key={file.fileName}><input className="native-check" type="checkbox" checked={outputSelected[file.fileName] !== false} disabled={converting} onChange={event => setOutputSelected(current => ({ ...current, [file.fileName]: event.target.checked }))} /><span title={file.fileName}>{file.fileName}</span></label>)}
+          {!outputFiles.length && <p className="empty-state">还没有转换结果</p>}
+        </div>
+        <div className="audio-actions"><button disabled={converting || !selectedOutputCount} onClick={addSelectedOutput}>加入音频池</button><button disabled={converting || !outputFiles.length} onClick={clearOutput}>清空</button></div>
+      </section>
+    </div>
+  </section>
+}
 function PanelHead({ title, action, onAction }) { return <div className="panel-head"><strong>{title}</strong>{action && <button onClick={onAction}>{action}</button>}</div> }
 function Field({ label, children }) { return <div className="field"><span>{label}</span>{children}</div> }
 function Toggle({ title, hint, value, setValue }) { return <label className="toggle-row"><div><strong>{title}</strong><small>{hint}</small></div><input className="native-check switch" type="checkbox" checked={value} onChange={event => setValue(event.target.checked)} /></label> }

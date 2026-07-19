@@ -10,7 +10,12 @@ let audioPath
 let serverPath
 let iconPath
 let developmentServerAssembly
+let converterInputPath
+let converterOutputPath
+let ffmpegPath
+let ffprobePath
 const audioExtensions = new Set(['.wav', '.mp3', '.ogg', '.flac', '.m4a', '.aac', '.wma'])
+const converterExtensions = new Set(['.wav', '.mp3', '.m4a'])
 const fallbackAccentColor = '#3d82f5'
 const settingKeys = new Set(['LaunchAtStartup', 'Theme', 'DefaultVolume', 'OutputDevice', 'SmoothScroll'])
 const eventStateKeys = new Set(['AudioName', 'Enabled', 'UseCustomVolume', 'TriggerVolume'])
@@ -68,6 +73,8 @@ async function updateSavedEventState(callback, changes) {
 }
 const isAudioFile = fileName => audioExtensions.has(path.extname(fileName).toLowerCase())
 const isSafeAudioFileName = fileName => typeof fileName === 'string' && fileName.length > 0 && path.basename(fileName) === fileName && isAudioFile(fileName) && !/[<>:"/\\|?*\u0000-\u001f]/.test(fileName) && !/[. ]$/.test(fileName)
+const isConverterFile = fileName => converterExtensions.has(path.extname(fileName).toLowerCase())
+const isSafeConverterFileName = fileName => typeof fileName === 'string' && fileName.length > 0 && path.basename(fileName) === fileName && isConverterFile(fileName) && !/[<>:"/\\|?*\u0000-\u001f]/.test(fileName) && !/[. ]$/.test(fileName)
 function readAccentColor() {
   if (process.platform === 'win32') {
     try {
@@ -94,15 +101,25 @@ let audioHostBuffer = ''
 let audioHostRequestId = 0
 const audioHostRequests = new Map()
 const previewChannels = new Map()
+let converterRunning = false
 let gracefulStopTimer = null
 let exitAfterServerStops = false
 let allowAppQuit = false
 
 function configureRuntimePaths() {
   eventStatePath = path.join(app.getPath('userData'), 'event-state.json')
+  const converterRoot = path.join(app.getPath('userData'), 'converter')
+  converterInputPath = path.join(converterRoot, 'input')
+  converterOutputPath = path.join(converterRoot, 'output')
   iconPath = app.isPackaged
     ? path.join(process.resourcesPath, 'TriggerPad.ico')
     : path.join(developmentRoot, 'UI', 'build-resources', 'TriggerPad.ico')
+  ffmpegPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'ffmpeg', 'ffmpeg.exe')
+    : path.join(developmentRoot, 'UI', 'build-resources', 'ffmpeg', 'ffmpeg.exe')
+  ffprobePath = app.isPackaged
+    ? path.join(process.resourcesPath, 'ffmpeg', 'ffprobe.exe')
+    : path.join(developmentRoot, 'UI', 'build-resources', 'ffmpeg', 'ffprobe.exe')
   if (app.isPackaged) {
     const runtimeRoot = path.join(app.getPath('userData'), 'runtime')
     configPath = path.join(runtimeRoot, 'config.json')
@@ -223,6 +240,8 @@ async function stopPreviewChannelsForFile(fileName) {
 }
 
 async function initializeRuntimeData() {
+  await fs.mkdir(converterInputPath, { recursive: true })
+  await fs.mkdir(converterOutputPath, { recursive: true })
   if (!app.isPackaged) return
   const defaultsRoot = path.join(process.resourcesPath, 'defaults')
   await fs.mkdir(audioPath, { recursive: true })
@@ -285,11 +304,115 @@ async function listAudio() {
 }
 
 async function uniqueDestination(fileName) {
+  return uniqueDestinationIn(audioPath, fileName)
+}
+
+async function uniqueDestinationIn(directory, fileName) {
   const parsed = path.parse(fileName)
   let candidate = fileName
   let index = 1
   while (true) {
-    try { await fs.access(path.join(audioPath, candidate)); candidate = `${parsed.name} (${index++})${parsed.ext}` } catch { return path.join(audioPath, candidate) }
+    try { await fs.access(path.join(directory, candidate)); candidate = `${parsed.name} (${index++})${parsed.ext}` } catch { return path.join(directory, candidate) }
+  }
+}
+
+async function listConverterFiles(directory) {
+  await fs.mkdir(directory, { recursive: true })
+  const entries = await fs.readdir(directory, { withFileTypes: true })
+  return entries.filter(entry => entry.isFile() && isConverterFile(entry.name)).map(entry => ({
+    fileName: entry.name,
+    audioName: path.parse(entry.name).name
+  })).sort((a, b) => a.fileName.localeCompare(b.fileName, 'zh-CN'))
+}
+
+function sendConverterProgress(payload) {
+  for (const win of BrowserWindow.getAllWindows()) win.webContents.send('converter:progress', payload)
+}
+
+function execFileText(file, args) {
+  return new Promise((resolve, reject) => {
+    execFile(file, args, { windowsHide: true, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+      if (error) {
+        error.stderr = stderr
+        reject(error)
+        return
+      }
+      resolve(stdout)
+    })
+  })
+}
+
+async function readAudioDuration(filePath) {
+  const output = await execFileText(ffprobePath, ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', filePath])
+  const duration = Number.parseFloat(String(output).trim())
+  return Number.isFinite(duration) && duration > 0 ? duration : 0
+}
+
+function ffmpegArguments(inputPath, outputPath, targetFormat) {
+  const codecArguments = targetFormat === 'wav'
+    ? ['-c:a', 'pcm_s16le']
+    : targetFormat === 'mp3'
+      ? ['-c:a', 'libmp3lame', '-b:a', '192k']
+      : ['-c:a', 'aac', '-b:a', '192k']
+  return ['-y', '-i', inputPath, '-map', '0:a:0', '-vn', ...codecArguments, '-progress', 'pipe:1', '-nostats', outputPath]
+}
+
+function runConversion(inputPath, outputPath, targetFormat, onProgress) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(ffmpegPath, ffmpegArguments(inputPath, outputPath, targetFormat), { windowsHide: true, shell: false })
+    let stderr = ''
+    let stdoutBuffer = ''
+    child.stdout.on('data', chunk => {
+      stdoutBuffer += chunk.toString('utf8')
+      const lines = stdoutBuffer.split(/\r?\n/)
+      stdoutBuffer = lines.pop() || ''
+      for (const line of lines) {
+        const match = line.match(/^out_time_(?:us|ms)=(\d+)$/)
+        if (match) onProgress(Number(match[1]))
+      }
+    })
+    child.stderr.on('data', chunk => { stderr = `${stderr}${chunk.toString('utf8')}`.slice(-8000) })
+    child.on('error', reject)
+    child.on('close', code => {
+      if (code === 0) resolve()
+      else reject(new Error(stderr.trim() || `FFmpeg exited with code ${code ?? 'unknown'}`))
+    })
+  })
+}
+
+async function convertQueuedAudio(targetFormat) {
+  if (!['wav', 'mp3', 'm4a'].includes(targetFormat)) throw new Error('Invalid target format')
+  if (converterRunning) throw new Error('Conversion is already running')
+  converterRunning = true
+  const statuses = {}
+  try {
+    await fs.access(ffmpegPath)
+    await fs.access(ffprobePath)
+    const inputs = await listConverterFiles(converterInputPath)
+    if (!inputs.length) throw new Error('No audio files to convert')
+    for (const input of inputs) {
+      const inputPath = path.join(converterInputPath, input.fileName)
+      const destination = await uniqueDestinationIn(converterOutputPath, `${path.parse(input.fileName).name}.${targetFormat}`)
+      statuses[input.fileName] = { state: 'running', progress: 0 }
+      sendConverterProgress({ fileName: input.fileName, state: 'running', progress: 0 })
+      try {
+        const duration = await readAudioDuration(inputPath)
+        await runConversion(inputPath, destination, targetFormat, outputTime => {
+          const progress = duration > 0 ? Math.min(99, Math.max(0, Math.floor((outputTime / 1000000) / duration * 100))) : 0
+          statuses[input.fileName] = { state: 'running', progress }
+          sendConverterProgress({ fileName: input.fileName, state: 'running', progress })
+        })
+        statuses[input.fileName] = { state: 'success', progress: 100 }
+        sendConverterProgress({ fileName: input.fileName, state: 'success', progress: 100 })
+      } catch (error) {
+        await fs.rm(destination, { force: true })
+        statuses[input.fileName] = { state: 'error', progress: 0, message: error.message }
+        sendConverterProgress({ fileName: input.fileName, state: 'error', progress: 0, message: error.message })
+      }
+    }
+    return { inputFiles: await listConverterFiles(converterInputPath), outputFiles: await listConverterFiles(converterOutputPath), statuses }
+  } finally {
+    converterRunning = false
   }
 }
 
@@ -401,6 +524,54 @@ ipcMain.handle('audio:clear', async () => {
   await Promise.all(files.map(file => fs.rm(path.join(audioPath, file.fileName), { force: true })))
   return []
 })
+ipcMain.handle('converter:list-input', () => listConverterFiles(converterInputPath))
+ipcMain.handle('converter:list-output', () => listConverterFiles(converterOutputPath))
+ipcMain.handle('converter:import', async event => {
+  if (converterRunning) throw new Error('Conversion is running')
+  const result = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender), {
+    title: '导入待转换音频', properties: ['openFile', 'multiSelections'],
+    filters: [{ name: '音频文件', extensions: [...converterExtensions].map(ext => ext.slice(1)) }]
+  })
+  if (result.canceled) return { canceled: true, files: await listConverterFiles(converterInputPath) }
+  await fs.mkdir(converterInputPath, { recursive: true })
+  for (const sourcePath of result.filePaths) {
+    const destination = await uniqueDestinationIn(converterInputPath, path.basename(sourcePath))
+    await fs.copyFile(sourcePath, destination)
+  }
+  return { canceled: false, files: await listConverterFiles(converterInputPath) }
+})
+ipcMain.handle('converter:remove-input', async (_event, fileName) => {
+  if (converterRunning) throw new Error('Conversion is running')
+  if (!isSafeConverterFileName(fileName)) throw new Error('Invalid converter audio file name')
+  await fs.rm(path.join(converterInputPath, fileName), { force: true })
+  return listConverterFiles(converterInputPath)
+})
+ipcMain.handle('converter:clear-input', async () => {
+  if (converterRunning) throw new Error('Conversion is running')
+  const files = await listConverterFiles(converterInputPath)
+  await Promise.all(files.map(file => fs.rm(path.join(converterInputPath, file.fileName), { force: true })))
+  return []
+})
+ipcMain.handle('converter:convert', async (_event, targetFormat) => convertQueuedAudio(targetFormat))
+ipcMain.handle('converter:clear-output', async () => {
+  if (converterRunning) throw new Error('Conversion is running')
+  const files = await listConverterFiles(converterOutputPath)
+  await Promise.all(files.map(file => fs.rm(path.join(converterOutputPath, file.fileName), { force: true })))
+  return []
+})
+ipcMain.handle('converter:add-to-audio-pool', async (_event, fileNames) => {
+  if (converterRunning) throw new Error('Conversion is running')
+  if (!Array.isArray(fileNames)) throw new Error('Invalid output selection')
+  const selected = [...new Set(fileNames)]
+  for (const fileName of selected) {
+    if (!isSafeConverterFileName(fileName)) throw new Error('Invalid converter audio file name')
+    const source = path.join(converterOutputPath, fileName)
+    await fs.access(source)
+    const destination = await uniqueDestination(fileName)
+    await fs.copyFile(source, destination)
+  }
+  return listAudio()
+})
 ipcMain.handle('window:minimize', event => BrowserWindow.fromWebContents(event.sender)?.minimize())
 ipcMain.handle('window:is-maximized', event => BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false)
 ipcMain.handle('window:is-always-on-top', event => BrowserWindow.fromWebContents(event.sender)?.isAlwaysOnTop() ?? false)
@@ -462,7 +633,7 @@ const createWindow = () => {
     minWidth: 800,
     minHeight: 600,
     center: true,
-    title: 'TriggerPad v0.1.0-alpha',
+    title: 'TriggerPad v0.1.0',
     frame: false,
     resizable: true,
     thickFrame: true,

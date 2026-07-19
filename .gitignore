@@ -20,3 +20,5 @@ Thumbs.db
 /UI/build-resources/*
 !/UI/build-resources/
 !/UI/build-resources/TriggerPad.ico
+!/UI/build-resources/ffmpeg/
+!/UI/build-resources/ffmpeg/**

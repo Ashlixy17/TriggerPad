@@ -15,6 +15,14 @@ contextBridge.exposeInMainWorld('triggerPad', {
   renameAudio: (oldFileName, newFileName) => ipcRenderer.invoke('audio:rename', { oldFileName, newFileName }),
   removeAudio: fileName => ipcRenderer.invoke('audio:remove', fileName),
   clearAudio: () => ipcRenderer.invoke('audio:clear'),
+  listConverterInput: () => ipcRenderer.invoke('converter:list-input'),
+  listConverterOutput: () => ipcRenderer.invoke('converter:list-output'),
+  importConverterAudio: () => ipcRenderer.invoke('converter:import'),
+  removeConverterInput: fileName => ipcRenderer.invoke('converter:remove-input', fileName),
+  clearConverterInput: () => ipcRenderer.invoke('converter:clear-input'),
+  convertAudio: targetFormat => ipcRenderer.invoke('converter:convert', targetFormat),
+  clearConverterOutput: () => ipcRenderer.invoke('converter:clear-output'),
+  addConverterOutputToAudioPool: fileNames => ipcRenderer.invoke('converter:add-to-audio-pool', fileNames),
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
   isMaximizedWindow: () => ipcRenderer.invoke('window:is-maximized'),
   isAlwaysOnTop: () => ipcRenderer.invoke('window:is-always-on-top'),
@@ -38,6 +46,11 @@ contextBridge.exposeInMainWorld('triggerPad', {
     const listener = (_event, state) => callback(state)
     ipcRenderer.on('audio:preview-state', listener)
     return () => ipcRenderer.removeListener('audio:preview-state', listener)
+  },
+  onConverterProgress: callback => {
+    const listener = (_event, update) => callback(update)
+    ipcRenderer.on('converter:progress', listener)
+    return () => ipcRenderer.removeListener('converter:progress', listener)
   },
   onWindowMaximized: callback => {
     const listener = (_event, maximized) => callback(Boolean(maximized))

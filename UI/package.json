@@ -1,6 +1,6 @@
 {
   "name": "triggerpad-ui",
-  "version": "0.1.0-alpha",
+  "version": "0.1.0",
   "private": true,
   "description": "TriggerPad desktop interface",
   "main": "electron/main.cjs",
@@ -39,6 +39,7 @@
     ],
     "extraResources": [
       { "from": "build-resources/server", "to": "server" },
+      { "from": "build-resources/ffmpeg", "to": "ffmpeg" },
       { "from": "build-resources/TriggerPad.ico", "to": "TriggerPad.ico" },
       { "from": "../config.json", "to": "defaults/config.json" },
       { "from": "../audio", "to": "defaults/audio" }
