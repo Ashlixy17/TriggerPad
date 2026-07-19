@@ -214,6 +214,21 @@ button { cursor: pointer; }
 .theme-dark .toggle-row .switch, .theme-light .toggle-row .switch,
 .theme-dark .toggle-row .switch:checked, .theme-light .toggle-row .switch:checked { border: 0; background: transparent; }
 .theme-light .native-check { color-scheme: light; }
+body .theme-light .native-check {
+  appearance: none;
+  box-sizing: border-box;
+  border: 1px solid #aeb6bc;
+  border-radius: 2px;
+  background: #fff;
+}
+body .theme-light .native-check:checked {
+  border-color: var(--accent-color);
+  background-color: var(--accent-color);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.2 6.6 11.2 12.7 4.8' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 15px 15px;
+}
 .event-row { cursor: pointer; }
 .event-row.disabled { opacity: .64; }
 .event-row.disabled:hover { opacity: .82; }
