@@ -4,8 +4,12 @@ contextBridge.exposeInMainWorld('triggerPad', {
   readConfig: () => ipcRenderer.invoke('config:read'),
   bindAudio: (callback, audioName) => ipcRenderer.invoke('config:bind-audio', { callback, audioName }),
   setEventEnabled: (callback, enabled) => ipcRenderer.invoke('config:set-event-enabled', { callback, enabled }),
+  updateEventAudio: (callback, changes) => ipcRenderer.invoke('config:update-event-audio', { callback, changes }),
   updateSettings: changes => ipcRenderer.invoke('settings:update', changes),
   listAudio: () => ipcRenderer.invoke('audio:list'),
+  listOutputDevices: () => ipcRenderer.invoke('audio:list-output-devices'),
+  playPreviewAudio: options => ipcRenderer.invoke('audio:preview-play', options),
+  stopPreviewAudio: channel => ipcRenderer.invoke('audio:preview-stop', channel),
   readAudio: fileName => ipcRenderer.invoke('audio:read', fileName),
   importAudio: () => ipcRenderer.invoke('audio:import'),
   renameAudio: (oldFileName, newFileName) => ipcRenderer.invoke('audio:rename', { oldFileName, newFileName }),
@@ -29,6 +33,11 @@ contextBridge.exposeInMainWorld('triggerPad', {
     const listener = (_event, status) => callback(status)
     ipcRenderer.on('server:status', listener)
     return () => ipcRenderer.removeListener('server:status', listener)
+  },
+  onPreviewAudioState: callback => {
+    const listener = (_event, state) => callback(state)
+    ipcRenderer.on('audio:preview-state', listener)
+    return () => ipcRenderer.removeListener('audio:preview-state', listener)
   },
   onWindowMaximized: callback => {
     const listener = (_event, maximized) => callback(Boolean(maximized))

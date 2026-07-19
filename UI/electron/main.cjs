@@ -8,6 +8,7 @@ let configPath
 let audioPath
 let serverPath
 let iconPath
+let developmentServerAssembly
 const audioExtensions = new Set(['.wav', '.mp3', '.ogg', '.flac', '.m4a', '.aac', '.wma'])
 const fallbackAccentColor = '#3d82f5'
 const settingKeys = new Set(['LaunchAtStartup', 'Theme', 'DefaultVolume', 'OutputDevice', 'SmoothScroll'])
@@ -35,6 +36,11 @@ function readAccentColor() {
   }
 }
 let serverProcess = null
+let audioHostProcess = null
+let audioHostBuffer = ''
+let audioHostRequestId = 0
+const audioHostRequests = new Map()
+const previewChannels = new Map()
 let gracefulStopTimer = null
 let exitAfterServerStops = false
 let allowAppQuit = false
@@ -52,7 +58,114 @@ function configureRuntimePaths() {
     configPath = path.join(developmentRoot, 'config.json')
     audioPath = path.join(developmentRoot, 'audio')
     serverPath = path.join(developmentRoot, 'Server')
+    developmentServerAssembly = path.join(serverPath, 'bin', 'Debug', 'net8.0-windows', 'TriggerPad.dll')
   }
+}
+
+function spawnServerExecutable(args = []) {
+  const options = {
+    cwd: serverPath,
+    windowsHide: true,
+    shell: false,
+    env: { ...process.env, TRIGGERPAD_CONFIG_PATH: configPath, TRIGGERPAD_AUDIO_PATH: audioPath }
+  }
+  return app.isPackaged
+    ? spawn(path.join(serverPath, 'TriggerPad.Server.exe'), args, options)
+    : spawn('dotnet', [developmentServerAssembly, ...args], options)
+}
+
+function broadcastPreviewState(state) {
+  if (state?.channel) {
+    if (state.state === 'started') previewChannels.set(state.channel, state.fileName)
+    else if (state.state === 'ended' || state.state === 'stopped' || state.state === 'error') previewChannels.delete(state.channel)
+  }
+  for (const win of BrowserWindow.getAllWindows()) win.webContents.send('audio:preview-state', state)
+}
+
+function handleAudioHostLine(line) {
+  if (!line.trim()) return
+  let message
+  try { message = JSON.parse(line) } catch {
+    sendServerLog('WARN', `Unable to parse audio host response: ${line}`)
+    return
+  }
+  if (message.type === 'state') {
+    broadcastPreviewState(message)
+    return
+  }
+  if (message.type !== 'response' || !message.id) return
+  const pending = audioHostRequests.get(message.id)
+  if (!pending) return
+  audioHostRequests.delete(message.id)
+  clearTimeout(pending.timer)
+  if (message.ok) pending.resolve(message.result)
+  else pending.reject(new Error(message.error || 'Audio host request failed'))
+}
+
+function rejectAudioHostRequests(error) {
+  for (const pending of audioHostRequests.values()) {
+    clearTimeout(pending.timer)
+    pending.reject(error)
+  }
+  audioHostRequests.clear()
+}
+
+function ensureAudioHost() {
+  if (audioHostProcess && !audioHostProcess.killed) return audioHostProcess
+  audioHostBuffer = ''
+  const child = spawnServerExecutable(['--audio-host'])
+  audioHostProcess = child
+  child.stdout.on('data', data => {
+    audioHostBuffer += data.toString('utf8')
+    const lines = audioHostBuffer.split(/\r?\n/)
+    audioHostBuffer = lines.pop() || ''
+    lines.forEach(handleAudioHostLine)
+  })
+  child.stderr.on('data', data => sendServerLog('ERROR', `Audio host: ${data.toString('utf8')}`))
+  child.on('error', error => {
+    rejectAudioHostRequests(error)
+    broadcastPreviewState({ channel: 'system', state: 'error', message: error.message })
+  })
+  child.on('close', code => {
+    if (audioHostProcess === child) audioHostProcess = null
+    previewChannels.clear()
+    rejectAudioHostRequests(new Error(`Audio host exited with code ${code ?? 'unknown'}`))
+  })
+  return child
+}
+
+function sendAudioHostCommand(command, timeoutMs = 10000) {
+  return new Promise((resolve, reject) => {
+    const child = ensureAudioHost()
+    const id = `audio-${Date.now()}-${++audioHostRequestId}`
+    const timer = setTimeout(() => {
+      audioHostRequests.delete(id)
+      reject(new Error('Audio host request timed out'))
+    }, timeoutMs)
+    audioHostRequests.set(id, { resolve, reject, timer })
+    child.stdin.write(`${JSON.stringify({ id, ...command })}\n`, error => {
+      if (!error) return
+      const pending = audioHostRequests.get(id)
+      if (!pending) return
+      audioHostRequests.delete(id)
+      clearTimeout(timer)
+      reject(error)
+    })
+  })
+}
+
+function stopAudioHost() {
+  const child = audioHostProcess
+  audioHostProcess = null
+  if (!child || child.killed) return
+  try { child.stdin.write(`${JSON.stringify({ id: 'shutdown', command: 'shutdown' })}\n`) } catch { /* process already closed */ }
+  const timer = setTimeout(() => { if (!child.killed) child.kill() }, 1000)
+  child.once('close', () => clearTimeout(timer))
+}
+
+async function stopPreviewChannelsForFile(fileName) {
+  const channels = [...previewChannels.entries()].filter(([, playingFile]) => !fileName || playingFile === fileName).map(([channel]) => channel)
+  await Promise.allSettled(channels.map(channel => sendAudioHostCommand({ command: 'stop', channel })))
 }
 
 async function initializeRuntimeData() {
@@ -141,6 +254,18 @@ ipcMain.handle('config:set-event-enabled', async (_event, { callback, enabled })
   await fs.writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8')
   return config[callback]
 })
+ipcMain.handle('config:update-event-audio', async (_event, { callback, changes }) => {
+  const config = await readConfig()
+  if (!config[callback] || typeof config[callback] !== 'object') throw new Error(`Unknown event callback: ${callback}`)
+  if (Object.prototype.hasOwnProperty.call(changes || {}, 'UseCustomVolume')) config[callback].UseCustomVolume = Boolean(changes.UseCustomVolume)
+  if (Object.prototype.hasOwnProperty.call(changes || {}, 'TriggerVolume')) {
+    const volume = Number(changes.TriggerVolume)
+    if (!Number.isFinite(volume)) throw new Error('Invalid trigger volume')
+    config[callback].TriggerVolume = Math.max(0, Math.min(100, Math.round(volume)))
+  }
+  await fs.writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8')
+  return config[callback]
+})
 ipcMain.handle('settings:update', async (_event, changes) => {
   const config = await readConfig()
   config.Settings = config.Settings || {}
@@ -151,6 +276,29 @@ ipcMain.handle('settings:update', async (_event, changes) => {
   return config.Settings
 })
 ipcMain.handle('audio:list', () => listAudio())
+ipcMain.handle('audio:list-output-devices', async () => {
+  const devices = await sendAudioHostCommand({ command: 'list-devices' })
+  return (devices || []).map(device => ({ id: device.Id, name: device.Name, isDefault: Boolean(device.IsDefault) }))
+})
+ipcMain.handle('audio:preview-play', async (_event, options) => {
+  const channel = options?.channel
+  const fileName = options?.fileName
+  if (!['pool', 'test'].includes(channel)) throw new Error('Invalid preview channel')
+  if (!isSafeAudioFileName(fileName)) throw new Error('Invalid audio file name')
+  const result = await sendAudioHostCommand({
+    command: 'play', channel, fileName,
+    volume: Math.max(0, Math.min(100, Math.round(Number(options?.volume) || 0))),
+    outputDevice: typeof options?.outputDevice === 'string' ? options.outputDevice : 'default'
+  })
+  const normalized = { deviceId: result.DeviceId, deviceName: result.DeviceName, usedFallback: Boolean(result.UsedFallback) }
+  if (normalized.usedFallback) sendServerLog('WARN', `Selected audio output is unavailable; using ${normalized.deviceName}.`)
+  return normalized
+})
+ipcMain.handle('audio:preview-stop', async (_event, channel) => {
+  if (!['pool', 'test'].includes(channel)) throw new Error('Invalid preview channel')
+  const result = await sendAudioHostCommand({ command: 'stop', channel })
+  return { stopped: Boolean(result?.stopped ?? result?.Stopped) }
+})
 ipcMain.handle('audio:read', async (_event, fileName) => {
   if (!isAudioFile(fileName) || path.basename(fileName) !== fileName) throw new Error('Invalid audio file name')
   const extension = path.extname(fileName).toLowerCase()
@@ -183,6 +331,7 @@ ipcMain.handle('audio:rename', async (_event, { oldFileName, newFileName }) => {
   try { await fs.access(newPath); throw new Error('An audio file with that name already exists') } catch (error) {
     if (error?.code !== 'ENOENT') throw error
   }
+  await stopPreviewChannelsForFile(oldFileName)
   await fs.rename(oldPath, newPath)
   const config = await readConfig()
   let changed = false
@@ -197,10 +346,12 @@ ipcMain.handle('audio:rename', async (_event, { oldFileName, newFileName }) => {
 })
 ipcMain.handle('audio:remove', async (_event, fileName) => {
   if (!isAudioFile(fileName) || path.basename(fileName) !== fileName) throw new Error('Invalid audio file name')
+  await stopPreviewChannelsForFile(fileName)
   await fs.rm(path.join(audioPath, fileName), { force: true })
   return listAudio()
 })
 ipcMain.handle('audio:clear', async () => {
+  await stopPreviewChannelsForFile()
   const files = await listAudio()
   await Promise.all(files.map(file => fs.rm(path.join(audioPath, file.fileName), { force: true })))
   return []
@@ -230,15 +381,8 @@ ipcMain.handle('server:start', async () => {
   try {
     await fs.access(serverPath)
     await clearResidualServerProcesses()
-    const serverOptions = {
-      cwd: serverPath,
-      windowsHide: true,
-      shell: false,
-      env: { ...process.env, TRIGGERPAD_CONFIG_PATH: configPath, TRIGGERPAD_AUDIO_PATH: audioPath }
-    }
-    serverProcess = app.isPackaged
-      ? spawn(path.join(serverPath, 'TriggerPad.Server.exe'), [], serverOptions)
-      : spawn('dotnet', ['run'], serverOptions)
+    if (!app.isPackaged) await fs.access(developmentServerAssembly)
+    serverProcess = spawnServerExecutable()
     serverProcess.stdout.on('data', data => sendServerLog('INFO', data.toString('utf8')))
     serverProcess.stderr.on('data', data => sendServerLog('ERROR', data.toString('utf8')))
     serverProcess.on('error', error => sendServerLog('ERROR', `Unable to start Server: ${error.message}`))
@@ -255,7 +399,7 @@ ipcMain.handle('server:start', async () => {
       }
     })
     for (const win of BrowserWindow.getAllWindows()) win.webContents.send('server:status', { running: true })
-    sendServerLog('INFO', app.isPackaged ? 'Starting packaged Server.' : 'Starting Server: dotnet run')
+    sendServerLog('INFO', app.isPackaged ? 'Starting packaged Server.' : 'Starting built Server assembly.')
     return { started: true }
   } catch (error) {
     sendServerLog('ERROR', `Server directory is unavailable: ${error.message}`)
@@ -314,4 +458,5 @@ app.on('before-quit', event => {
   event.preventDefault()
   requestServerStop({ quitApp: true })
 })
+app.on('will-quit', stopAudioHost)
 app.on('window-all-closed', () => process.platform !== 'darwin' && app.quit())
