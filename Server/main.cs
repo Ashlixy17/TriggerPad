@@ -45,7 +45,7 @@ void PlayConfiguredEvent(string callback)
     {
         var config = JObject.Parse(File.ReadAllText(configPath));
         var eventConfig = config[callback] as JObject;
-        if (eventConfig is null || eventConfig["Enabled"]?.Value<bool>() == false) return;
+        if (eventConfig is null || eventConfig["Enabled"]?.Value<bool>() != true) return;
 
         var audioName = eventConfig["AudioName"]?.Value<string>();
         if (string.IsNullOrWhiteSpace(audioName)) return;
